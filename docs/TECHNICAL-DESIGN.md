@@ -8,7 +8,7 @@
 | Date | 2026-10-29 |
 | Status | Draft for technical review |
 | Based on | [PRD.md](PRD.md) v1.0, [CODE-REVIEW.md](CODE-REVIEW.md), [DWS-HUB-INTEGRATION.md](DWS-HUB-INTEGRATION.md), and the source code as of 2026-10-29 |
-| Companion artefact | `docs/postgresql/001_target_schema.sql`, the target PostgreSQL 18 schema (validated on PostgreSQL 18.6) |
+| Companion artefact | `backend/db/migrations/0001_target_schema.sql`, the target PostgreSQL 18 schema, applied with `npm run db:migrate` (tested on PostgreSQL 18.6) |
 
 ---
 
@@ -231,10 +231,11 @@ module.exports = {
 | Variable | Server | Example / rule |
 |---|---|---|
 | `VITE_HUB_SDK_KEY`, `VITE_HUB_SDK_URL`, `VITE_GIT_SHA` | build of the frontend | Production Hub key and URL; release = git commit |
-| `PORT`, `HOST` | backend | `3001`, private IP (**code change C-1** below) |
+| `PORT`, `HOST`, `TRUST_PROXY_HOPS` | backend | `3001`; the backend private IP (default `127.0.0.1`); `1` with Nginx only, `2` if an SLB sits in front without `real_ip` |
 | `JWT_SECRET` | backend | ≥ 32 random characters; rotation logs everyone out |
 | `FRONTEND_URL`, `CORS_ORIGINS` | backend | `https://erp.example.com` |
-| `DATABASE_URL`, `PGSSLROOTCERT`, `PG_POOL_MAX` | backend | `postgres://erp_app_login@<rds-host>:5432/erp?sslmode=verify-full`; pool max 20 |
+| `DATABASE_URL`, `PG_POOL_MAX` | backend | `postgres://erp_app_login:<pw>@<rds-host>:5432/erp?sslmode=verify-full&sslrootcert=/opt/astar-erp/secrets/rds-ca.pem`; pool max 20 |
+| `MIGRATION_DATABASE_URL` | backend (deploy only) | Same form, owner account `erp_owner`; used only by `npm run db:migrate` |
 | `DWS_HUB_URL`, `DWS_HUB_CLIENT_ID`, `DWS_HUB_REDIRECT_URI`, `DWS_HUB_ALLOWED_EMAIL_DOMAINS` | backend | see DWS-HUB-INTEGRATION §3 |
 | `SERVICE_ACCOUNTS_DIR` | backend | `/opt/astar-erp/secrets/service-accounts` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_DOMAIN` | backend | Legacy Google sign-in; unset to disable |
@@ -247,13 +248,13 @@ module.exports = {
 
 | ID | Change | Files | Effort |
 |---|---|---|---|
-| C-1 | Bind to `process.env.HOST` (default `127.0.0.1`) instead of the hard-coded loopback, so the frontend server can reach the API | `backend/server.js` | XS |
+| C-1 | Bind to `process.env.HOST` (default `127.0.0.1`) instead of the hard-coded loopback, so the frontend server can reach the API; `TRUST_PROXY_HOPS` configurable. **Done (Phase 0).** | `backend/server.js` | XS |
 | C-2 | Add a PostgreSQL data-access layer (`pg` Pool, async) and move `app` / `security` / `audit` tables to it | `db/database.js`, `services/sessionAuth.js`, `googleAccountAccess.js`, `hubSso.js`, `loginSecurity.js`, `userActivity.js`, `routes/users.js`, `routes/auth.js`, `appsScriptSheetSync.js` | L |
 | C-3 | Write the mirror to `mirror.*` with staging tables and a transactional swap; maintain `mirror.database_meta.version` | `services/bulkDataSync.js` | M |
 | C-4 | Replace the SQLite file-signature cache keys with `mirror.database_meta.version` | all dashboard builders (`databaseFileSignature` users), `routes/data.js` | M |
 | C-5 | Build `links.*` in PostgreSQL | `services/vesselLinks.js`, `vesselLinkStore.js`, `vesselMatching.js`, `contractUnlink.js` | M |
 | C-6 | Use one Postgres-backed `audit.ensure_month_partitions` job, and retention by `DROP TABLE` of old partitions | `services/userActivity.js` | S |
-| C-7 | Run SQL migrations at deploy time, replacing the inline `ALTER TABLE` try/catch; numbered files in `backend/db/migrations/` | new | S |
+| C-7 | Run SQL migrations at deploy time, replacing the inline `ALTER TABLE` try/catch; numbered files in `backend/db/migrations/`. **Runner done (Phase 0):** `backend/db/postgres/migrate.js`, `npm run db:migrate` / `db:status`; checksums, advisory lock, one transaction per file. | `backend/db/postgres/migrate.js`, `scripts/db-migrate.js` | S |
 | C-8 | A data migration script (SQLite → PostgreSQL) for `erp.db`, `login_security.db` and `user_activity.db`. The mirror is rebuilt from Sheets, so it is not migrated. | new `backend/scripts/migrate-sqlite-to-postgres.js` | S |
 | C-9 | Readiness probe checks PostgreSQL (`SELECT 1`) and pool saturation | `backend/server.js` | XS |
 
@@ -261,7 +262,7 @@ Sizes: XS < ½ day, S ≈ 1 day, M 2–3 days, L 4–6 days. The total, includin
 
 ### 4.7 Deployment procedure
 
-1. **Database.** Create the RDS instance, database `erp` and the login roles. Run the migrations (`001_target_schema.sql`, then later ones) as the owner account.
+1. **Database.** Create the RDS instance, database `erp` and the login users. On the backend server run `MIGRATION_DATABASE_URL=… npm run db:migrate` as the owner account; it applies every pending file in `backend/db/migrations/` and is safe to re-run. `npm run db:status` shows what is applied.
 2. **Backend.**
    - `git pull` or copy the release.
    - `npm ci --omit=dev`.
@@ -953,8 +954,8 @@ Verification is the staging load test (`backend/scripts/load-test.js`): 25 virtu
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0. Foundations** (week 1) | Code into git + CI; C-1 (HOST); provision the 3 servers and RDS; apply `001_target_schema.sql` | Staging reachable; schema applied |
-| **1. Data layer** (weeks 1–2) | C-2, C-6, C-7: async `pg` repositories for `app` / `security` / `audit`; port tests to a PostgreSQL test container | All backend tests green against PostgreSQL |
+| **0. Foundations** (week 1) | Code into git + CI; C-1 (HOST); C-7 migration runner; provision the 3 servers and RDS; `npm run db:migrate` | Staging reachable; schema applied. **Code part done 2026-10-30**; provisioning open |
+| **1. Data layer** (weeks 1–2) | C-2, C-6: async `pg` repositories for `app` / `security` / `audit`; port tests to a PostgreSQL test container | All backend tests green against PostgreSQL |
 | **2. Mirror and links** (weeks 2–3) | C-3, C-4, C-5: staging + swap ingestion; version-keyed caches | Dashboards identical to SQLite output for the same sheet snapshot (compare JSON) |
 | **3. Data migration and staging** (week 3) | C-8 script; load test; DWS Hub staging registration | Load test passes; SSO checks pass |
 | **4. Cut-over** (1 evening) | Freeze writes (maintenance page) → final SQLite export → import → start backend on PostgreSQL → first sync → smoke test → DNS / SLB switch | `/api/ready` 200; users sign in; first edits written to Sheets |
@@ -993,7 +994,9 @@ Verification is the staging load test (`backend/scripts/load-test.js`): 25 virtu
 
 | File | Content |
 |---|---|
-| `docs/postgresql/001_target_schema.sql` | Full target DDL: schemas, tables, indexes, partitions, roles |
+| `backend/db/migrations/0001_target_schema.sql` | Full target DDL: schemas, tables, indexes, partitions, roles |
+| `backend/db/postgres/migrate.js`, `backend/scripts/db-migrate.js` | Migration runner and CLI |
+| `.github/workflows/ci.yml` | CI: backend tests with PostgreSQL 18, migrations, frontend tests and build |
 | `docs/images/*.svg` / `*.png` | Diagrams in this document (SVG is editable) |
 | `backend/.env.example`, `frontend/.env.example` | Configuration templates |
 | `backend/scripts/load-test.js` | Concurrency gate |

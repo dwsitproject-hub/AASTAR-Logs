@@ -26,9 +26,15 @@ const appsScriptSheetSync = require('./services/appsScriptSheetSync');
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
+// Loopback by default (single host behind a local Nginx). On the 3-server
+// platform set HOST to the backend's private IP so the frontend server can proxy to it.
+const HOST = String(process.env.HOST || '127.0.0.1').trim();
+// Number of reverse proxies in front of Express whose X-Forwarded-For is trusted:
+// 1 = Nginx only (default); 2 = SLB + Nginx when Nginx does not rewrite the client IP.
+const TRUST_PROXY_HOPS = Math.max(0, Math.min(5, Number.parseInt(process.env.TRUST_PROXY_HOPS || '1', 10) || 0));
 
 app.disable('x-powered-by');
-app.set('trust proxy', 1);
+app.set('trust proxy', TRUST_PROXY_HOPS);
 
 // The SPA's own document headers (CSP, HSTS) are set by Nginx; these cover the API responses.
 app.use(helmet({
@@ -229,8 +235,8 @@ appsScriptSheetSync.start();
 startBulkDataSync();
 setTimeout(() => preloadDashboards('startup'), 8000);
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`ERP backend running on port ${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`ERP backend running on ${HOST}:${PORT}`);
 });
 
 // Keep serving when one request's promise rejects outside a handler's try/catch
