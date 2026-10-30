@@ -61,6 +61,12 @@ export function AuthProvider({ children }) {
     return storeSession(res.data);
   };
 
+  // Local Docker/dev stacks only; the backend returns 404 unless LOCAL_DEV_LOGIN_EMAIL is set.
+  const devLogin = async () => {
+    const res = await api.post('/auth/dev-login');
+    return storeSession(res.data);
+  };
+
   const logout = async () => {
     resetHubUser();
     try {
@@ -91,7 +97,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, googleLogin, logout, hasPermission, hasTabAccess, loading }}>
+    <AuthContext.Provider value={{ user, googleLogin, devLogin, logout, hasPermission, hasTabAccess, loading }}>
       {children}
     </AuthContext.Provider>
   );

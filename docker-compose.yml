@@ -1,0 +1,84 @@
+# Local stack mirroring the 3-server platform (TECHNICAL-DESIGN.md §4):
+#   frontend (Nginx, http://localhost:8090) -> backend (Node) ; db (PostgreSQL 18)
+#
+#   copy .env.example .env      # then set JWT_SECRET and LOCAL_DEV_LOGIN_EMAIL
+#   docker compose up -d --build
+#   docker compose exec backend npm run seed:admin -- you@example.com --username "Your Name"
+#
+# The backend still keeps its data in SQLite (volume erp-data) until Phase 1;
+# PostgreSQL gets the target schema through the migrate job. Without Google
+# service accounts in ./backend/service-accounts the sheet sync stays empty.
+name: astar-erp
+
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: erp
+      POSTGRES_USER: erp_owner
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp_local_only}
+    volumes:
+      - erp-pg:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55440}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp_owner -d erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    build: ./backend
+    image: astar-erp-backend:local
+    command: ["node", "scripts/db-migrate.js"]
+    environment:
+      JWT_SECRET: unused-by-the-migration-job-but-required-by-config
+      MIGRATION_DATABASE_URL: postgres://erp_owner:${POSTGRES_PASSWORD:-erp_local_only}@db:5432/erp
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    image: astar-erp-backend:local
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      HOST: 0.0.0.0
+      TRUST_PROXY_HOPS: 1
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      FRONTEND_URL: http://localhost:${FRONTEND_PORT:-8090}
+      LOCAL_DEV_LOGIN_EMAIL: ${LOCAL_DEV_LOGIN_EMAIL:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      DWS_HUB_URL: ${DWS_HUB_URL:-}
+      DWS_HUB_CLIENT_ID: ${DWS_HUB_CLIENT_ID:-}
+      DWS_HUB_REDIRECT_URI: ${DWS_HUB_REDIRECT_URI:-}
+      DWS_HUB_ALLOWED_EMAIL_DOMAINS: ${DWS_HUB_ALLOWED_EMAIL_DOMAINS:-}
+      # Read from Phase 1 onwards; the schema is already migrated.
+      DATABASE_URL: postgres://erp_owner:${POSTGRES_PASSWORD:-erp_local_only}@db:5432/erp
+    volumes:
+      - erp-data:/app/data
+      - ./backend/service-accounts:/app/service-accounts:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_GIT_SHA: ${VITE_GIT_SHA:-local}
+        VITE_HUB_SDK_KEY: ${VITE_HUB_SDK_KEY:-}
+        VITE_HUB_SDK_URL: ${VITE_HUB_SDK_URL:-}
+    image: astar-erp-frontend:local
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8090}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  erp-data:
+  erp-pg:

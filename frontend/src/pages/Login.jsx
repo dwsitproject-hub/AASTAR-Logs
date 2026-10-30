@@ -96,7 +96,8 @@ export default function Login() {
   const [remember, setRemember] = useState(true);
   const [googleConfig, setGoogleConfig] = useState(null);
   const [hubSsoEnabled, setHubSsoEnabled] = useState(false);
-  const { googleLogin } = useAuth();
+  const [devLoginConfig, setDevLoginConfig] = useState(null);
+  const { googleLogin, devLogin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const nextPath = typeof location.state?.from === 'string' ? location.state.from : '/dashboard';
@@ -115,6 +116,7 @@ export default function Login() {
       setGoogleConfig(response.data?.google || null);
       // The desktop shell cannot complete a browser redirect flow, so it keeps Google sign-in.
       setHubSsoEnabled(Boolean(response.data?.hubSso?.enabled) && !window.erpDesktop);
+      setDevLoginConfig(response.data?.devLogin?.enabled ? response.data.devLogin : null);
     }).catch(() => {});
     return () => { active = false; };
   }, []);
@@ -151,6 +153,18 @@ export default function Login() {
     }
   }, [completeLogin, googleLogin, remember]);
 
+  const handleDevLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      completeLogin(await devLogin());
+    } catch (err) {
+      setError(err.response?.data?.error || 'Local sign-in failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const inputStyle = {
     width: '100%', padding: '10px 14px', borderRadius: 8,
     border: '1px solid var(--border)', fontSize: 14,
@@ -176,6 +190,18 @@ export default function Login() {
           <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-main)' }}>Astar ERP</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 4 }}>Sign in to your account</p>
         </div>
+
+        {devLoginConfig && (
+          <div style={{ marginBottom: 20, padding: 12, borderRadius: 8, border: '1px dashed #f59e0b', background: '#fffbeb' }}>
+            <div style={{ fontSize: 12, color: '#92400e', marginBottom: 8 }}>Local development stack</div>
+            <button type="button" onClick={handleDevLogin} disabled={loading} style={{
+              width: '100%', padding: 10, borderRadius: 8, border: '1px solid #f59e0b',
+              background: '#fff', color: '#92400e', fontSize: 14, fontWeight: 600,
+            }}>
+              Sign in as {devLoginConfig.email}
+            </button>
+          </div>
+        )}
 
         {hubSsoEnabled && (
           <>

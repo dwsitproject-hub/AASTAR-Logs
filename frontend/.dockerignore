@@ -1,0 +1,13 @@
+node_modules
+dist
+dist.*
+.env
+.env.*
+!.env.example
+*.pre-*
+*.bak
+*.bak-*
+*.backup-*
+*.log
+Dockerfile
+.dockerignore

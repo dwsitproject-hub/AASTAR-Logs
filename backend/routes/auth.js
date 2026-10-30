@@ -27,6 +27,7 @@ const {
   readTransaction,
   startTransaction,
 } = require('../services/hubSso');
+const { findLocalDevUser, localDevLoginEmail } = require('../services/localDevLogin');
 const {
   currentShiftWindow,
   credentialAuditMetadata,
@@ -47,6 +48,9 @@ const GOOGLE_ALLOWED_DOMAIN = String(process.env.GOOGLE_ALLOWED_DOMAIN || 'kpn-c
 const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || '').trim();
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 const HUB_SESSION_REMEMBER = ['1', 'true', 'on'].includes(String(process.env.DWS_HUB_SESSION_REMEMBER || '').trim().toLowerCase());
+// Throws (and stops the server) if it is set together with NODE_ENV=production.
+const LOCAL_DEV_LOGIN_EMAIL = localDevLoginEmail();
+if (LOCAL_DEV_LOGIN_EMAIL) console.warn(`Local dev sign-in is ENABLED for ${LOCAL_DEV_LOGIN_EMAIL}. Never use this outside a local stack.`);
 let manualActivityReportInFlight = false;
 
 function safeString(value, maxLength) {
@@ -155,7 +159,21 @@ router.get('/access-status', (req, res) => {
     hubSso: {
       enabled: getHubSsoClient().config.enabled,
     },
+    devLogin: LOCAL_DEV_LOGIN_EMAIL ? { enabled: true, email: LOCAL_DEV_LOGIN_EMAIL } : { enabled: false },
   });
+});
+
+// Local stacks only (see services/localDevLogin.js): signs in the one seeded account.
+router.post('/dev-login', (req, res) => {
+  if (!LOCAL_DEV_LOGIN_EMAIL) return res.status(404).json({ error: 'Not found' });
+  const user = findLocalDevUser(getDb(), LOCAL_DEV_LOGIN_EMAIL);
+  if (!user || user.is_approved !== 1) {
+    return res.status(403).json({
+      code: 'ACCOUNT_PENDING',
+      error: `No approved account for ${LOCAL_DEV_LOGIN_EMAIL}. Run: npm run seed:admin -- ${LOCAL_DEV_LOGIN_EMAIL}`,
+    });
+  }
+  issueSession(user, req, res, 'local-dev', false);
 });
 
 // Used by Nginx auth_request before it serves an ERP document route. The

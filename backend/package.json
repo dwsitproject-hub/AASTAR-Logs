@@ -9,7 +9,8 @@
     "test": "node --require ./test/setupEnv.js --test test/*.test.js",
     "activity:report": "node scripts/send-user-activity-report.js",
     "db:migrate": "node scripts/db-migrate.js",
-    "db:status": "node scripts/db-migrate.js status"
+    "db:status": "node scripts/db-migrate.js status",
+    "seed:admin": "node scripts/seed-admin.js"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",
