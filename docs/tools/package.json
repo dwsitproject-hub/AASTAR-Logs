@@ -1,0 +1,14 @@
+{
+  "name": "astar-erp-docs-tools",
+  "private": true,
+  "description": "Rebuilds the documentation diagrams (docs/images) and Word files (docs/*.docx) from the Markdown sources.",
+  "scripts": {
+    "diagrams": "node diagrams.js ../images",
+    "docx": "node md2docx.js ../PRD.md ../Astar-ERP-PRD.docx \"Astar ERP — Product Requirements Document v1.0\" && node md2docx.js ../TECHNICAL-DESIGN.md ../Astar-ERP-Technical-Design.docx \"Astar ERP — Technical Design Document v1.0\"",
+    "build": "npm run diagrams && npm run docx"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "docx": "^9.15.0"
+  }
+}

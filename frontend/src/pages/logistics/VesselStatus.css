@@ -1,0 +1,161 @@
+.vessel-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vessel-status-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-family: Calibri, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  transition: filter 150ms ease, opacity 150ms ease;
+}
+
+.vessel-status-action-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.vessel-status-action-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.vessel-status-action-button:focus-visible,
+.vessel-status-presentation-close:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.vessel-status-fullscreen-button {
+  background: #1a1a2e;
+}
+
+.vessel-status-action-icon,
+.vessel-status-close-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vessel-status-table-shell {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.vessel-status-table-stage {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.vessel-status-table-fit {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+.vessel-status-table-scroll {
+  overflow-x: auto;
+}
+
+.vessel-status-table-shell.is-presenting {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  grid-template-rows: 44px minmax(0, 1fr);
+  width: auto;
+  background: var(--bg-main, #eef2f5);
+  color: var(--text-main, #172033);
+  font-family: Calibri, Arial, sans-serif;
+}
+
+.vessel-status-presentation-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 0 14px 0 18px;
+  border-bottom: 1px solid var(--border, #cbd5e1);
+  background: var(--bg-card, #fff);
+}
+
+.vessel-status-presentation-title {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.vessel-status-presentation-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.vessel-status-presentation-close:hover {
+  background: rgba(100, 116, 139, 0.14);
+}
+
+.vessel-status-table-shell.is-presenting .vessel-status-table-stage {
+  align-items: flex-start;
+  justify-content: center;
+  width: auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px 20px;
+}
+
+.vessel-status-table-shell.is-presenting .vessel-status-table-fit {
+  flex: 0 0 auto;
+  width: calc(100vw - 40px);
+  max-width: none;
+}
+
+.vessel-status-table-shell.is-presenting .vessel-status-table-content {
+  position: static;
+  width: 100%;
+}
+
+.vessel-status-table-shell.is-presenting .vessel-status-table-content table {
+  width: 100% !important;
+}
+
+.vessel-status-table-shell.is-presenting .vessel-status-table-scroll {
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vessel-status-action-button {
+    transition: none;
+  }
+}

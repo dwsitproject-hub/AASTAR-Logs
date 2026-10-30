@@ -1,0 +1,97 @@
+.atlas-page {
+  min-height: 100vh;
+  background: #ece9df;
+  color: #242821;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 15px;
+}
+
+.atlas-header {
+  min-height: 104px;
+  padding: 20px clamp(20px, 5vw, 76px);
+  display: grid;
+  grid-template-columns: 58px minmax(240px, 1fr) minmax(240px, 360px);
+  align-items: center;
+  gap: 18px;
+  background: #17221b;
+  color: #f4f1e8;
+  border-bottom: 5px solid #9d7a31;
+}
+
+.atlas-mark {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d5ba74;
+  color: #d5ba74;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.atlas-kicker, .atlas-overline {
+  color: #9d7a31;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.atlas-header h1 { font-size: 25px; font-weight: 400; margin-top: 3px; }
+.atlas-search span { display: block; margin-bottom: 6px; font: 11px 'Segoe UI', sans-serif; color: #c9cdc7; }
+.atlas-search input { width: 100%; border: 1px solid #657067; background: #f7f5ef; padding: 9px 11px; color: #242821; }
+
+.atlas-layout {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 250px;
+  gap: 34px;
+  padding: 34px clamp(20px, 4vw, 58px) 48px;
+}
+
+.atlas-sidebar { border-right: 1px solid #c8c3b5; padding-right: 24px; }
+.atlas-sidebar a { display: block; padding: 7px 0; color: #3f5546; }
+.atlas-side-title { font: 700 11px 'Segoe UI', sans-serif; text-transform: uppercase; color: #737268; margin-bottom: 5px; }
+.atlas-side-spaced { margin-top: 27px; }
+.atlas-breadcrumb { color: #77776f; font: 12px 'Segoe UI', sans-serif; margin-bottom: 28px; }
+.atlas-article h2 { font-size: clamp(30px, 4vw, 47px); line-height: 1.05; font-weight: 400; margin: 7px 0 20px; }
+.atlas-lead { max-width: 780px; font-size: 18px; line-height: 1.65; }
+.atlas-notice { border-left: 4px solid #9d7a31; background: #f7f4ea; padding: 13px 16px; margin-top: 24px; line-height: 1.5; }
+.atlas-section { margin-top: 42px; padding-top: 25px; border-top: 1px solid #c8c3b5; }
+.atlas-section h3 { font-size: 24px; font-weight: 400; }
+.atlas-region-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #c8c3b5; margin-top: 18px; border: 1px solid #c8c3b5; }
+.atlas-region-grid div { background: #f6f3eb; padding: 17px; }
+.atlas-region-grid strong, .atlas-region-grid span { display: block; }
+.atlas-region-grid strong { margin-bottom: 7px; }
+.atlas-region-grid span { color: #62645e; line-height: 1.45; font-size: 14px; }
+.atlas-section-heading { display: flex; justify-content: space-between; align-items: end; gap: 20px; }
+.atlas-status { font: 600 11px 'Segoe UI', sans-serif; color: #2f6a3e; border: 1px solid #94aa98; padding: 5px 8px; }
+.atlas-ledger { margin-top: 16px; border-top: 2px solid #31382f; }
+.atlas-ledger-row { display: grid; grid-template-columns: 62px 1fr 76px; gap: 12px; padding: 11px 8px; border-bottom: 1px solid #cbc7bc; font: 13px 'Segoe UI', sans-serif; }
+.atlas-ledger-row time { color: #797a72; }
+.atlas-ledger-row .is-complete { color: #2f6a3e; }
+.atlas-ledger-row .is-pending { color: #936b1d; }
+
+.atlas-facts { align-self: start; background: #f7f4ea; border: 1px solid #bcb5a4; }
+.atlas-facts-title { padding: 15px 17px; background: #35463a; color: #fff; font-size: 20px; }
+.atlas-facts dl { padding: 8px 17px 16px; }
+.atlas-facts dt { margin-top: 13px; color: #77766e; font: 11px 'Segoe UI', sans-serif; text-transform: uppercase; }
+.atlas-facts dd { margin-top: 3px; line-height: 1.35; }
+.atlas-footer { border-top: 1px solid #c8c3b5; padding: 18px; text-align: center; color: #74746d; font: 12px 'Segoe UI', sans-serif; }
+
+@media (max-width: 900px) {
+  .atlas-header { grid-template-columns: 52px 1fr; }
+  .atlas-search { grid-column: 1 / -1; }
+  .atlas-layout { grid-template-columns: 1fr; }
+  .atlas-sidebar { display: none; }
+  .atlas-facts { grid-row: 2; }
+}
+
+@media (max-width: 560px) {
+  .atlas-header { padding: 17px; }
+  .atlas-layout { padding: 24px 16px 36px; }
+  .atlas-region-grid { grid-template-columns: 1fr; }
+  .atlas-article h2 { font-size: 34px; }
+}

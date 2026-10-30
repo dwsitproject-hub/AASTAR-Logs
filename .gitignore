@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Secrets and local configuration (keep the *.example templates)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+backend/service-accounts/
+backend/secrets/
+
+# Runtime data: SQLite databases, mirrors, backups of production data
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+
+# Build output (current and historical)
+frontend/dist/
+frontend/dist.*/
+frontend/dist-desktop/
+
+# Side-by-side backup copies from before version control
+# (e.g. server.js.pre-dws-hub-sso-20261029, sheets.js.backup-before-x, auth.js.bak-tabperms-20260707)
+*.pre-*
+*.backup-*
+*.bak
+*.bak-*
+backend/rollback-archive-*/
+
+# Logs and tooling
+*.log
+npm-debug.log*
+.pm2/
+coverage/
+.claude/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

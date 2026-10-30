@@ -1,0 +1,82 @@
+.contract-unlink-page { max-width: 1480px; margin: 0 auto; color: var(--text-main); }
+.cu-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
+.cu-header h1 { font-size: 25px; line-height: 1.15; font-weight: 700; letter-spacing: 0; }
+.cu-eyebrow { color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
+.cu-total { min-width: 100px; text-align: right; }
+.cu-total strong { display: block; font-size: 22px; line-height: 1; }
+.cu-total span { display: block; color: var(--text-muted); font-size: 11px; margin-top: 4px; }
+.cu-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.cu-search { position: relative; display: flex; align-items: center; flex: 1; min-width: 260px; height: 40px; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 7px; }
+.cu-search:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(185,78,58,.14); }
+.cu-search > svg { width: 17px; height: 17px; margin-left: 12px; fill: none; stroke: var(--text-muted); stroke-width: 1.8; }
+.cu-search input { flex: 1; min-width: 0; height: 100%; padding: 0 10px; border: 0; outline: 0; background: transparent; color: var(--text-main); font-size: 13px; }
+.cu-search button, .cu-message button { border: 0; background: transparent; color: var(--text-muted); padding: 8px 12px; font-size: 16px; line-height: 1; }
+.cu-source-summary { display: flex; align-items: center; gap: 6px; overflow-x: auto; }
+.cu-source-summary span { flex: 0 0 auto; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-card); color: var(--text-muted); font-size: 10px; }
+.cu-source-summary strong { color: var(--text-main); margin-left: 3px; }
+.cu-message { display: flex; align-items: center; justify-content: space-between; border: 1px solid; border-radius: 6px; padding: 8px 10px 8px 12px; margin-bottom: 12px; font-size: 12px; }
+.cu-message.success { background: #edf7f0; border-color: #a9d4b5; color: #235f36; }
+.cu-message.error { background: #fff0ee; border-color: #e8b5ad; color: #8b2f22; }
+body.dark .cu-message.success { background: #1d3526; border-color: #3e654a; color: #bfe0c8; }
+body.dark .cu-message.error { background: #402522; border-color: #75433d; color: #f2c5be; }
+.cu-table-shell { overflow-x: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 7px; box-shadow: var(--shadow); }
+.cu-table { width: 100%; border-collapse: collapse; table-layout: auto; }
+.cu-table th { padding: 9px 10px; background: color-mix(in srgb, var(--bg-app) 75%, var(--bg-card)); color: var(--text-muted); border-bottom: 1px solid var(--border-strong); font-size: 10px; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.cu-table td { padding: 10px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: middle; }
+.cu-table tr:last-child td { border-bottom: 0; }
+.cu-table tbody tr:hover { background: color-mix(in srgb, var(--primary) 4%, var(--bg-card)); }
+.cu-contract-main { display: flex; align-items: baseline; gap: 7px; white-space: nowrap; }
+.cu-contract-main strong { font-size: 13px; }
+.cu-contract-main span, .cu-code { color: var(--text-muted); font-size: 10px; }
+.cu-muted, .cu-code { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10px; }
+.cu-side { display: inline-block; padding: 3px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.cu-side.sales { background: #e7f3ed; color: #27654d; }
+.cu-side.purchase { background: #e9f1fa; color: #285c8b; }
+body.dark .cu-side.sales { background: #21382f; color: #a7d5c0; }
+body.dark .cu-side.purchase { background: #213344; color: #add0f0; }
+.cu-partial { display: inline-block; margin-left: 6px; padding: 2px 5px; border: 1px solid #d5a74c; border-radius: 4px; color: #8d6414; font-size: 9px; font-weight: 700; }
+.cu-action { width: 1%; white-space: nowrap; text-align: right; }
+.cu-action button { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 5px 8px; border: 1px solid #df9e93; border-radius: 5px; background: transparent; color: #a43c2d; font-size: 11px; font-weight: 600; transition: background .15s, color .15s, border-color .15s; }
+.cu-action button:hover { background: #a43c2d; border-color: #a43c2d; color: #fff; }
+.cu-action svg, .cu-button svg, .cu-modal-icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.cu-state { padding: 56px 20px; text-align: center; color: var(--text-muted); font-size: 12px; }
+.cu-load-more { display: block; min-width: 120px; margin: 14px auto 0; padding: 8px 14px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-card); color: var(--text-main); font-size: 12px; }
+.cu-modal-backdrop { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; padding: 20px; background: rgba(20,25,28,.54); }
+.cu-modal { width: min(430px, 100%); padding: 22px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow-lg); }
+.cu-modal-icon { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 14px; border-radius: 50%; background: #fff0ee; color: #a43c2d; }
+.cu-modal h2 { font-size: 18px; margin-bottom: 8px; }
+.cu-modal p { color: var(--text-muted); font-size: 13px; line-height: 1.55; }
+.cu-modal dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0 20px; }
+.cu-modal dl div { min-width: 0; padding: 9px; border: 1px solid var(--border); border-radius: 5px; }
+.cu-modal dt { color: var(--text-muted); font-size: 9px; text-transform: uppercase; }
+.cu-modal dd { overflow: hidden; margin-top: 3px; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.cu-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.cu-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 7px 12px; border: 1px solid; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.cu-button:disabled { cursor: wait; opacity: .65; }
+.cu-button-secondary { border-color: var(--border-strong); background: transparent; color: var(--text-main); }
+.cu-button-danger { border-color: #a43c2d; background: #a43c2d; color: #fff; }
+.cu-button:focus-visible, .cu-action button:focus-visible, .cu-load-more:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+@media (max-width: 800px) {
+  .cu-header { align-items: center; }
+  .cu-toolbar { align-items: stretch; flex-direction: column; }
+  .cu-search { min-width: 0; width: 100%; }
+  .cu-source-summary { flex-wrap: wrap; overflow: visible; }
+  .cu-table-shell { overflow: visible; border: 0; background: transparent; box-shadow: none; }
+  .cu-table, .cu-table tbody { display: block; }
+  .cu-table thead { display: none; }
+  .cu-table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-bottom: 10px; padding: 13px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg-card); box-shadow: var(--shadow); }
+  .cu-table td { display: block; min-width: 0; padding: 0; border: 0; }
+  .cu-table td::before { content: attr(data-label); display: block; margin-bottom: 3px; color: var(--text-muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+  .cu-table .cu-action { grid-column: 1 / -1; width: auto; }
+  .cu-table .cu-action::before { display: none; }
+  .cu-action button { width: 100%; }
+}
+
+@media (max-width: 460px) {
+  .cu-header h1 { font-size: 21px; }
+  .cu-table tr { grid-template-columns: 1fr; }
+  .cu-contract-main { flex-wrap: wrap; white-space: normal; }
+  .cu-modal dl { grid-template-columns: 1fr; }
+}
