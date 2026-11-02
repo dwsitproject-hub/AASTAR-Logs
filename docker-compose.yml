@@ -48,6 +48,8 @@ services:
       TRUST_PROXY_HOPS: 1
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       FRONTEND_URL: http://localhost:${FRONTEND_PORT:-8090}
+      # The same page opened as 127.0.0.1 is a different origin.
+      CORS_ORIGINS: http://127.0.0.1:${FRONTEND_PORT:-8090}
       LOCAL_DEV_LOGIN_EMAIL: ${LOCAL_DEV_LOGIN_EMAIL:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       DWS_HUB_URL: ${DWS_HUB_URL:-}
