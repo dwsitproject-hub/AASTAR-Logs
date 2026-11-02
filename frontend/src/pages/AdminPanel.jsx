@@ -3,6 +3,7 @@ import api from '../services/api';
 import { trackHubAction } from '../services/hubSdk';
 import { useAuth } from '../context/AuthContext';
 import { DEPARTMENTS, DEPT_LABELS, deptOf } from '../navConfig';
+import SpreadsheetSources from '../components/SpreadsheetSources';
 
 const ALL_DEPTS = DEPARTMENTS.map(d => d.dept);
 // Departments granted whole (no sub-tabs) vs. per-sub-tab.
@@ -166,83 +167,6 @@ function UserModal({ user, canGrantAdmin, onClose, onSave }) {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function SheetsConfig() {
-  const [configs, setConfigs] = useState([]);
-  const [form, setForm] = useState({ sheet_id: '', sheet_name: '', tab_name: '', department: 'commercial', service_account_index: 0, range: '' });
-  const [msg, setMsg] = useState(null);
-
-  const load = () => api.get('/sheets/config').then(r => setConfigs(r.data)).catch(() => {});
-  useEffect(() => { load(); }, []);
-
-  const handleAdd = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/sheets/config', form);
-      setMsg({ type: 'success', text: 'Sheet added' });
-      setForm({ sheet_id: '', sheet_name: '', tab_name: '', department: 'commercial', service_account_index: 0, range: '' });
-      load();
-    } catch (err) { setMsg({ type: 'error', text: err.response?.data?.error || 'Failed' }); }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Remove this sheet config?')) return;
-    await api.delete('/sheets/config/' + id);
-    load();
-  };
-
-  const handleRefresh = async () => {
-    await api.post('/sheets/refresh');
-    setMsg({ type: 'success', text: 'Cache refreshed' });
-  };
-
-  const inputStyle = { width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, outline: 'none' };
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 600 }}>Google Sheets Configuration</h3>
-        <button onClick={handleRefresh} style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid var(--border)', background: '#fff', fontSize: 13 }}>Refresh Cache</button>
-      </div>
-      {msg && <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, fontSize: 13, background: msg.type === 'success' ? '#f0fdf4' : '#fef2f2', color: msg.type === 'success' ? '#16a34a' : '#dc2626', border: '1px solid ' + (msg.type === 'success' ? '#bbf7d0' : '#fecaca') }}>{msg.text}</div>}
-      <form onSubmit={handleAdd} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 20, background: '#f9fafb', padding: 16, borderRadius: 10, border: '1px solid var(--border)' }}>
-        <div><label style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, display: 'block' }}>Sheet ID</label><input required value={form.sheet_id} onChange={e => setForm(f => ({ ...f, sheet_id: e.target.value }))} placeholder="Google Sheet ID" style={inputStyle} /></div>
-        <div><label style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, display: 'block' }}>Sheet Name</label><input required value={form.sheet_name} onChange={e => setForm(f => ({ ...f, sheet_name: e.target.value }))} placeholder="Display name" style={inputStyle} /></div>
-        <div><label style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, display: 'block' }}>Tab Name</label><input required value={form.tab_name} onChange={e => setForm(f => ({ ...f, tab_name: e.target.value }))} placeholder="Sheet1" style={inputStyle} /></div>
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, display: 'block' }}>Department</label>
-          <select value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} style={inputStyle}>
-            {ALL_DEPTS.map(d => <option key={d} value={d}>{DEPT_LABELS[d]}</option>)}
-          </select>
-        </div>
-        <div><label style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, display: 'block' }}>Service Account #</label><input type="number" min="0" max="7" value={form.service_account_index} onChange={e => setForm(f => ({ ...f, service_account_index: parseInt(e.target.value) }))} style={inputStyle} /></div>
-        <div><label style={{ fontSize: 12, fontWeight: 500, marginBottom: 4, display: 'block' }}>Range (optional)</label><input value={form.range} onChange={e => setForm(f => ({ ...f, range: e.target.value }))} placeholder="e.g. A:Z" style={inputStyle} /></div>
-        <div style={{ display: 'flex', alignItems: 'flex-end' }}><button type="submit" style={{ width: '100%', padding: '8px', borderRadius: 6, background: 'var(--primary)', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600 }}>+ Add Sheet</button></div>
-      </form>
-      {configs.length === 0 ? (
-        <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: 20 }}>No sheets configured yet.</p>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead><tr style={{ background: '#f9fafb' }}>
-            {['Sheet Name', 'Tab', 'Range', 'Department', 'SA #', ''].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {configs.map(c => (
-              <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '9px 12px' }}>{c.sheet_name}</td>
-                <td style={{ padding: '9px 12px', color: 'var(--text-muted)' }}>{c.tab_name}</td>
-                <td style={{ padding: '9px 12px', color: 'var(--text-muted)', fontSize: 12 }}>{c.range || '—'}</td>
-                <td style={{ padding: '9px 12px' }}>{DEPT_LABELS[c.department]}</td>
-                <td style={{ padding: '9px 12px' }}>{c.service_account_index}</td>
-                <td style={{ padding: '9px 12px' }}><button onClick={() => handleDelete(c.id)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', fontSize: 12 }}>Remove</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
     </div>
   );
 }
@@ -466,7 +390,7 @@ export default function AdminPanel() {
             </table>
           </>
         ) : tab === 'sheets' ? (
-          <div style={{ padding: 24 }}><SheetsConfig /></div>
+          <div style={{ padding: 24 }}><SpreadsheetSources /></div>
         ) : (
           <IpSecurity />
         )}

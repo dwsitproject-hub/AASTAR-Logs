@@ -80,7 +80,9 @@ test('migrations against PostgreSQL', { skip: TEST_DATABASE_URL ? false : 'TEST_
   await t.test('a fresh database gets the full target schema, and a second run is a no-op', async () => {
     const client = await freshDatabase();
     const first = await migrate(client);
-    assert.deepEqual(first.applied, ['0001_target_schema.sql']);
+    const shipped = listMigrations();
+    assert.deepEqual(first.applied, shipped.map(m => m.file));
+    assert.equal(first.applied[0], '0001_target_schema.sql');
     const { rows: schemas } = await client.query(
       "SELECT nspname FROM pg_namespace WHERE nspname IN ('app','security','audit','mirror','links') ORDER BY 1",
     );
@@ -90,10 +92,11 @@ test('migrations against PostgreSQL', { skip: TEST_DATABASE_URL ? false : 'TEST_
     assert.equal(users[0].d, 'audit.authentication_events_default');
     const second = await migrate(client);
     assert.deepEqual(second.applied, []);
-    assert.equal(second.alreadyApplied, 1);
-    const { rows: history } = await client.query('SELECT version, name, checksum FROM public.schema_migrations');
-    assert.equal(history.length, 1);
-    assert.equal(history[0].checksum, listMigrations()[0].checksum);
+    assert.equal(second.alreadyApplied, shipped.length);
+    const { rows: history } = await client.query('SELECT version, name, checksum FROM public.schema_migrations ORDER BY version');
+    assert.deepEqual(history.map(row => row.checksum), shipped.map(m => m.checksum));
+    const { rows: sources } = await client.query("SELECT to_regclass('app.spreadsheet_sources') AS t");
+    assert.equal(sources[0].t, 'app.spreadsheet_sources');
   });
 
   await t.test('new migrations apply in order; dry-run changes nothing', async () => {

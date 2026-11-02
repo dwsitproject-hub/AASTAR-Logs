@@ -56,8 +56,9 @@ services:
       DWS_HUB_CLIENT_ID: ${DWS_HUB_CLIENT_ID:-}
       DWS_HUB_REDIRECT_URI: ${DWS_HUB_REDIRECT_URI:-}
       DWS_HUB_ALLOWED_EMAIL_DOMAINS: ${DWS_HUB_ALLOWED_EMAIL_DOMAINS:-}
-      # Google Sheets: copies for this stack (config/dataSources.js). Copies-only: a sheet
-      # without a SHEET_ID_* copy is switched off, never synced against production.
+      # Google Sheets: the SHEET_ID_* values seed Admin -> Sheets Config on a fresh database;
+      # the page is the source of truth after that. Copies-only: a production spreadsheet
+      # is refused there and never synced.
       SHEETS_COPIES_ONLY: 1
       SHEET_ID_AASTAR_SALES: ${SHEET_ID_AASTAR_SALES:-}
       SHEET_ID_GR: ${SHEET_ID_GR:-}
