@@ -466,6 +466,8 @@ async function refreshBulkDatabases() {
     loadCredentials();
     const groups = new Map();
     for (const definition of DATA_DATABASES) {
+      // Switched off for this stack (SHEET_ID_*=none): reported unavailable below.
+      if (!definition.sheetId) continue;
       const key = `${definition.sheetId}::${definition.serviceAccountEmail}`;
       if (!groups.has(key)) groups.set(key, { sheetId: definition.sheetId, email: definition.serviceAccountEmail, sources: new Map() });
       for (const source of definition.sources) groups.get(key).sources.set(sourceKey(source), source);

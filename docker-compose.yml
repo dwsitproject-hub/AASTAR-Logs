@@ -56,6 +56,16 @@ services:
       DWS_HUB_CLIENT_ID: ${DWS_HUB_CLIENT_ID:-}
       DWS_HUB_REDIRECT_URI: ${DWS_HUB_REDIRECT_URI:-}
       DWS_HUB_ALLOWED_EMAIL_DOMAINS: ${DWS_HUB_ALLOWED_EMAIL_DOMAINS:-}
+      # Google Sheets: copies for this stack (config/dataSources.js). Copies-only: a sheet
+      # without a SHEET_ID_* copy is switched off, never synced against production.
+      SHEETS_COPIES_ONLY: 1
+      SHEET_ID_AASTAR_SALES: ${SHEET_ID_AASTAR_SALES:-}
+      SHEET_ID_GR: ${SHEET_ID_GR:-}
+      SHEET_ID_VESSEL: ${SHEET_ID_VESSEL:-}
+      SHEET_ID_STOCK: ${SHEET_ID_STOCK:-}
+      SHEET_ID_SHIPMENT_DETAILS: ${SHEET_ID_SHIPMENT_DETAILS:-}
+      SHEET_ID_TPG_OPERATIONS: ${SHEET_ID_TPG_OPERATIONS:-}
+      SHEETS_SERVICE_ACCOUNT_EMAIL: ${SHEETS_SERVICE_ACCOUNT_EMAIL:-}
       # Read from Phase 1 onwards; the schema is already migrated.
       DATABASE_URL: postgres://erp_owner:${POSTGRES_PASSWORD:-erp_local_only}@db:5432/erp
     volumes:
