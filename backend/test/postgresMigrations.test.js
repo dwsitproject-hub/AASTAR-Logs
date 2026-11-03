@@ -114,7 +114,7 @@ test('migrations against PostgreSQL', { skip: TEST_DATABASE_URL ? false : 'TEST_
     const second = await migrate(client);
     assert.deepEqual(second.applied, []);
     assert.equal(second.alreadyApplied, shipped.length);
-    const { rows: history } = await client.query('SELECT version, name, checksum FROM public.schema_migrations ORDER BY version');
+    const { rows: history } = await client.query('SELECT version, name, checksum FROM migrations.schema_migrations ORDER BY version');
     assert.deepEqual(history.map(row => row.checksum), shipped.map(m => m.checksum));
     const { rows: sources } = await client.query("SELECT to_regclass('app.spreadsheet_sources') AS t");
     assert.equal(sources[0].t, 'app.spreadsheet_sources');
@@ -144,7 +144,7 @@ test('migrations against PostgreSQL', { skip: TEST_DATABASE_URL ? false : 'TEST_
     await assert.rejects(migrate(client, { dir }), error => error.code === 'MIGRATION_FAILED' && /0002_broken\.sql/.test(error.message));
     assert.equal((await client.query("SELECT to_regclass('public.ok') AS t")).rows[0].t, 'ok');
     assert.equal((await client.query("SELECT to_regclass('public.half') AS t")).rows[0].t, null, 'partial DDL rolled back');
-    const { rows } = await client.query('SELECT version FROM public.schema_migrations ORDER BY version');
+    const { rows } = await client.query('SELECT version FROM migrations.schema_migrations ORDER BY version');
     assert.deepEqual(rows.map(r => Number(r.version)), [1]);
   });
 
@@ -166,7 +166,54 @@ test('migrations against PostgreSQL', { skip: TEST_DATABASE_URL ? false : 'TEST_
     const second = await connect(databases[databases.length - 1]);
     const [a, b] = await Promise.all([migrate(first, { dir }), migrate(second, { dir })]);
     assert.equal(a.applied.length + b.applied.length, 1);
-    const { rows } = await first.query('SELECT count(*)::int AS n FROM public.schema_migrations');
+    const { rows } = await first.query('SELECT count(*)::int AS n FROM migrations.schema_migrations');
     assert.equal(rows[0].n, 1);
+  });
+
+  await t.test('history kept in public by earlier runner versions is moved, not re-applied', async () => {
+    const client = await freshDatabase();
+    const dir = tempDir(t, {
+      '0001_base.sql': 'CREATE TABLE public.t4 (id int);',
+      '0002_next.sql': 'ALTER TABLE public.t4 ADD COLUMN note text;',
+    });
+    await client.query('CREATE TABLE public.t4 (id int)');
+    await client.query(`CREATE TABLE public.schema_migrations (
+      version integer PRIMARY KEY, name text NOT NULL, checksum text NOT NULL,
+      applied_at timestamptz NOT NULL DEFAULT now(), applied_by text NOT NULL DEFAULT current_user, duration_ms integer NOT NULL)`);
+    await client.query('INSERT INTO public.schema_migrations (version, name, checksum, duration_ms) VALUES (1, $1, $2, 1)', ['base', listMigrations(dir)[0].checksum]);
+    const result = await migrate(client, { dir });
+    assert.deepEqual(result.applied, ['0002_next.sql']);
+    const { rows } = await client.query("SELECT to_regclass('public.schema_migrations') AS legacy, (SELECT count(*)::int FROM migrations.schema_migrations) AS n");
+    assert.equal(rows[0].legacy, null);
+    assert.equal(rows[0].n, 2);
+  });
+
+  await t.test('an owner without CREATE on schema public (ApsaraDB console setup) can migrate', async () => {
+    // Database owned by another account; the owner only has ALL ON DATABASE.
+    // On PostgreSQL 15+ that gives no CREATE on schema public.
+    const role = `erp_migrate_owner_${crypto.randomBytes(4).toString('hex')}`;
+    const password = 'Owner/pw?#1';
+    await admin.query(`CREATE ROLE ${role} LOGIN PASSWORD '${password}'`);
+    t.after(async () => {
+      await admin.query(`DROP ROLE IF EXISTS ${role}`).catch(() => {});
+    });
+    const superClient = await freshDatabase();
+    const database = databases[databases.length - 1];
+    await admin.query(`GRANT ALL ON DATABASE ${database} TO ${role}`);
+    await superClient.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC`);
+
+    const url = new URL(TEST_DATABASE_URL);
+    url.username = role;
+    url.password = '';
+    url.pathname = `/${database}`;
+    const { Client } = require('pg');
+    const owner = new Client(connectionConfig({ MIGRATION_DATABASE_URL: url.toString(), MIGRATION_DATABASE_PASSWORD: password }));
+    await owner.connect();
+    clients.push(owner);
+    await assert.rejects(owner.query('CREATE TABLE public.probe (id int)'), /permission denied for schema public/);
+
+    const dir = tempDir(t, { '0001_own_schema.sql': 'CREATE SCHEMA owned; CREATE TABLE owned.t (id int);' });
+    const result = await migrate(owner, { dir });
+    assert.deepEqual(result.applied, ['0001_own_schema.sql']);
   });
 });

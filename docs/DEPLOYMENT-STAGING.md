@@ -247,9 +247,11 @@ SELECT datname, pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'astar_
 > `astar_erp` (authorized account `astar_erp_owner`, UTF8). Then, as the privileged account, run the two
 > `CREATE ROLE … NOLOGIN` lines and `GRANT ALL ON DATABASE astar_erp TO astar_erp_owner;`.
 
-The migrations run as `astar_erp_owner` (no superuser rights needed; verified on PostgreSQL 16 with the same
-setup). They create the schemas `app`, `security`, `audit`, `mirror`, `links` and record each file in
-`public.schema_migrations`.
+The migrations run as `astar_erp_owner` and only need the right to create schemas in `astar_erp` (database
+owner, or `GRANT ALL ON DATABASE`). They do not use schema `public`, which PostgreSQL 15+ and RDS often lock
+down. They create the schemas `app`, `security`, `audit`, `mirror`, `links` and record each file in
+`migrations.schema_migrations`. Verified on PostgreSQL 14, 16 and 18, including an owner without rights on
+`public`.
 
 ---
 
@@ -519,6 +521,7 @@ group rules and the deploy keys, and optionally `DROP DATABASE astar_erp` and th
 | Migration: `Invalid URL` or `The database URL is not a valid URL` | the password is inside `MIGRATION_DATABASE_URL` and contains `/ ? #` | take it out of the URL and put it in `MIGRATION_DATABASE_PASSWORD='…'` (6.2) |
 | Migration: `password authentication failed` / timeout | owner password, whitelist | 5.2, 6.2; `--skip-migrate` deploys the app meanwhile |
 | Migration: `permission denied for database astar_erp` | console path without the GRANT | run `GRANT ALL ON DATABASE astar_erp TO astar_erp_owner;` as the privileged account |
+| Migration: `permission denied for schema public` | a build before 3 Nov 2026 kept its history in `public` | `./deploy.sh` (pulls the current runner, which uses schema `migrations`) |
 | Migration: `server does not support SSL` / `SSL required` | `sslmode` does not match the RDS SSL setting | `sslmode=disable` (SSL off) or the CA setup in 6.2 (SSL on) |
 | Migration: `MIGRATION_CHECKSUM_MISMATCH` | an applied migration file was edited | never edit applied files; add a new numbered file |
 | Backend exits: `JWT_SECRET must be…` | secret missing/short | 6.2 |

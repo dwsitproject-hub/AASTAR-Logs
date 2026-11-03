@@ -3,7 +3,7 @@
 // PostgreSQL schema migrations for the target platform (ApsaraDB RDS for PostgreSQL 18).
 //
 // Files live in backend/db/migrations and are named NNNN_snake_case.sql. Each pending
-// file runs in its own transaction and is recorded in public.schema_migrations with a
+// file runs in its own transaction and is recorded in migrations.schema_migrations with a
 // SHA-256 checksum; an applied file that changes afterwards stops the run, so history
 // can only move forward through new files. A file whose first line is
 // `-- migrate:no-transaction` runs outside a transaction (e.g. CREATE INDEX CONCURRENTLY).
@@ -59,9 +59,20 @@ function listMigrations(dir = MIGRATIONS_DIR) {
   return migrations;
 }
 
+// The history lives in its own schema: on PostgreSQL 15+ and on managed services
+// (ApsaraDB) the owner account often may not create tables in schema public, while
+// creating a schema only needs the CREATE right on the database the migrations need anyway.
 async function ensureHistoryTable(client) {
+  await client.query('CREATE SCHEMA IF NOT EXISTS migrations');
+  // Earlier versions of this runner kept the history in public.
+  const { rows } = await client.query(
+    "SELECT to_regclass('public.schema_migrations') AS legacy, to_regclass('migrations.schema_migrations') AS current",
+  );
+  if (rows[0].legacy && !rows[0].current) {
+    await client.query('ALTER TABLE public.schema_migrations SET SCHEMA migrations');
+  }
   await client.query(`
-    CREATE TABLE IF NOT EXISTS public.schema_migrations (
+    CREATE TABLE IF NOT EXISTS migrations.schema_migrations (
       version      integer     PRIMARY KEY,
       name         text        NOT NULL,
       checksum     text        NOT NULL,
@@ -75,7 +86,7 @@ async function ensureHistoryTable(client) {
 // Compares the files on disk with the history table.
 async function migrationStatus(client, migrations) {
   await ensureHistoryTable(client);
-  const { rows } = await client.query('SELECT version, name, checksum, applied_at FROM public.schema_migrations ORDER BY version');
+  const { rows } = await client.query('SELECT version, name, checksum, applied_at FROM migrations.schema_migrations ORDER BY version');
   const applied = new Map(rows.map(row => [Number(row.version), row]));
   const onDisk = new Map(migrations.map(migration => [migration.version, migration]));
   return {
@@ -92,7 +103,7 @@ async function applyMigration(client, migration) {
   try {
     await client.query(migration.sql);
     await client.query(
-      'INSERT INTO public.schema_migrations (version, name, checksum, duration_ms) VALUES ($1, $2, $3, $4)',
+      'INSERT INTO migrations.schema_migrations (version, name, checksum, duration_ms) VALUES ($1, $2, $3, $4)',
       [migration.version, migration.name, migration.checksum, Date.now() - started],
     );
     if (migration.transactional) await client.query('COMMIT');
