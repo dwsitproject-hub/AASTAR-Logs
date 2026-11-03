@@ -480,23 +480,23 @@ CREATE INDEX links_child_idx ON links.links (child_node_id);
 
 -- ---------------------------------------------------------------------------
 -- Roles (create the login users separately; passwords are not stored here)
---   erp_app   : backend runtime  — DML on app/security/audit, full control of mirror/links
---   erp_read  : reporting / support — read-only
+--   astar_erp_app   : backend runtime  — DML on app/security/audit, full control of mirror/links
+--   astar_erp_read  : reporting / support — read-only
 -- ---------------------------------------------------------------------------
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_app')  THEN CREATE ROLE erp_app  NOLOGIN; END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_read') THEN CREATE ROLE erp_read NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'astar_erp_app')  THEN CREATE ROLE astar_erp_app  NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'astar_erp_read') THEN CREATE ROLE astar_erp_read NOLOGIN; END IF;
 END $$;
 
-GRANT USAGE ON SCHEMA app, security, audit, mirror, links TO erp_app, erp_read;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app, security, audit TO erp_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA app, security, audit, links TO erp_app;
-GRANT ALL ON SCHEMA mirror, links TO erp_app;
-GRANT ALL ON ALL TABLES IN SCHEMA mirror, links TO erp_app;
-GRANT EXECUTE ON FUNCTION audit.ensure_month_partitions(date) TO erp_app;
-GRANT SELECT ON ALL TABLES IN SCHEMA app, security, audit, mirror, links TO erp_read;
-ALTER DEFAULT PRIVILEGES IN SCHEMA mirror, links GRANT SELECT ON TABLES TO erp_read;
+GRANT USAGE ON SCHEMA app, security, audit, mirror, links TO astar_erp_app, astar_erp_read;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app, security, audit TO astar_erp_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA app, security, audit, links TO astar_erp_app;
+GRANT ALL ON SCHEMA mirror, links TO astar_erp_app;
+GRANT ALL ON ALL TABLES IN SCHEMA mirror, links TO astar_erp_app;
+GRANT EXECUTE ON FUNCTION audit.ensure_month_partitions(date) TO astar_erp_app;
+GRANT SELECT ON ALL TABLES IN SCHEMA app, security, audit, mirror, links TO astar_erp_read;
+ALTER DEFAULT PRIVILEGES IN SCHEMA mirror, links GRANT SELECT ON TABLES TO astar_erp_read;
 
 
 -- ---------------------------------------------------------------------------

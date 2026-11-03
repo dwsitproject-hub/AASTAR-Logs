@@ -15,6 +15,17 @@ ENV VITE_GIT_SHA=$VITE_GIT_SHA \
 RUN npm run build
 
 FROM nginx:1.27-alpine
-COPY nginx/default.conf /etc/nginx/conf.d/default.conf
+# local: the Docker Compose stack (backend service name, Docker DNS).
+# staging: deploy/staging/frontend, backend address from BACKEND_URL at start-up.
+ARG NGINX_CONFIG=local
+COPY nginx/ /tmp/nginx/
+RUN if [ "$NGINX_CONFIG" = "staging" ]; then \
+      mkdir -p /etc/nginx/templates \
+      && cp /tmp/nginx/staging.conf.template /etc/nginx/templates/default.conf.template \
+      && rm -f /etc/nginx/conf.d/default.conf; \
+    else \
+      cp /tmp/nginx/default.conf /etc/nginx/conf.d/default.conf; \
+    fi \
+    && rm -rf /tmp/nginx
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80

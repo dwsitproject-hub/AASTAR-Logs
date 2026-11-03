@@ -23,6 +23,8 @@ const {
   clearTransaction,
   getHubSsoClient,
   isAllowedHubEmail,
+  launchRestartAllowed,
+  markLaunchRestart,
   provisionHubUser,
   readTransaction,
   startTransaction,
@@ -389,9 +391,17 @@ router.get('/sso/callback', async (req, res) => {
     recordHubEvent(req, { result: 'failure', reason: `hub-error:${hubErrorCode}`, credentialSupplied: false });
     return redirectToLoginWithError(res, 'hub_denied');
   }
+  if (!transaction && code && launchRestartAllowed(req)) {
+    // Opened from the Hub tile: the Hub ran its own authorize, so the code's PKCE
+    // verifier is not ours and the code is never redeemed. Start a normal sign-in
+    // instead; with the user's Hub session it completes without a prompt.
+    markLaunchRestart(res);
+    recordHubEvent(req, { result: 'restarted', reason: 'hub-launch-restarted', credentialSupplied: false });
+    return res.redirect(302, '/api/auth/sso/login');
+  }
   if (!transaction || !code) {
-    // Expired, replayed or foreign callback (including a Hub-initiated launch that
-    // this app did not start): the PKCE verifier is unknown, so the code is unusable.
+    // Expired, replayed or foreign callback, or a second Hub launch right after a
+    // restart: the PKCE verifier is unknown, so the code is unusable.
     recordHubEvent(req, { result: 'failure', reason: transaction ? 'missing-code' : 'state-mismatch' });
     return redirectToLoginWithError(res, 'session_expired');
   }

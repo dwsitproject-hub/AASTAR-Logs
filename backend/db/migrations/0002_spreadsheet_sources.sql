@@ -28,7 +28,7 @@ CREATE INDEX spreadsheet_source_changes_key_idx
 
 COMMENT ON TABLE app.sheets_config IS 'Legacy: superseded by app.spreadsheet_sources; not read by the bulk sync.';
 
-GRANT SELECT, INSERT, UPDATE ON app.spreadsheet_sources TO erp_app;
-GRANT SELECT, INSERT ON app.spreadsheet_source_changes TO erp_app;
-GRANT USAGE, SELECT ON SEQUENCE app.spreadsheet_source_changes_id_seq TO erp_app;
-GRANT SELECT ON app.spreadsheet_sources, app.spreadsheet_source_changes TO erp_read;
+GRANT SELECT, INSERT, UPDATE ON app.spreadsheet_sources TO astar_erp_app;
+GRANT SELECT, INSERT ON app.spreadsheet_source_changes TO astar_erp_app;
+GRANT USAGE, SELECT ON SEQUENCE app.spreadsheet_source_changes_id_seq TO astar_erp_app;
+GRANT SELECT ON app.spreadsheet_sources, app.spreadsheet_source_changes TO astar_erp_read;

@@ -1,0 +1,35 @@
+# STAGING - frontend server 172.28.92.56 (nginx: pages + proxy to the backend server).
+#
+# Run from this folder:   ./deploy.sh           (pull, build with the git commit as release, start, check)
+# Settings:               .env next to this file (copy .env.example)
+# Users open:             http://172.28.92.56:3150/
+name: astar-erp-staging-fe
+
+services:
+  frontend:
+    build:
+      context: ../../../frontend
+      args:
+        NGINX_CONFIG: staging
+        # Reported to DWS Hub / Sentinel as the release: Sentinel reads the code of this commit.
+        VITE_GIT_SHA: ${VITE_GIT_SHA:-unknown}
+        VITE_HUB_SDK_KEY: ${VITE_HUB_SDK_KEY:-}
+        VITE_HUB_SDK_URL: ${VITE_HUB_SDK_URL:-http://test-dwshub.kpndomain.com}
+    image: astar-erp-frontend:staging
+    container_name: astar-erp-frontend-staging
+    environment:
+      # Backend server, private address and port (deploy/staging/backend).
+      BACKEND_URL: ${BACKEND_URL:?Set BACKEND_URL in deploy/staging/frontend/.env (copy .env.example)}
+    ports:
+      - "${FRONTEND_HOST_PORT:?Set FRONTEND_HOST_PORT in deploy/staging/frontend/.env (copy .env.example)}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

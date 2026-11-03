@@ -8,9 +8,14 @@ const crypto = require('node:crypto');
 const cookie = require('cookie');
 const jwt = require('jsonwebtoken');
 const { jwtSecret } = require('../config/config');
+const { SECURE_COOKIES } = require('./sessionCookie');
 
-const TRANSACTION_COOKIE_NAME = '__Host-erp_sso';
+const TRANSACTION_COOKIE_NAME = SECURE_COOKIES ? '__Host-erp_sso' : 'erp_sso';
 const TRANSACTION_MAX_AGE_SECONDS = 10 * 60;
+// Marks a Hub-launched callback that was restarted as a normal sign-in, so a
+// second unknown callback right after it is an error instead of a loop.
+const LAUNCH_RESTART_COOKIE_NAME = SECURE_COOKIES ? '__Host-erp_sso_launch' : 'erp_sso_launch';
+const LAUNCH_RESTART_MAX_AGE_SECONDS = 2 * 60;
 const DISCOVERY_TTL_MS = 60 * 60 * 1000;
 const HTTP_TIMEOUT_MS = 10 * 1000;
 const ID_TOKEN_ALGORITHMS = ['RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512', 'ES256', 'ES384', 'ES512', 'EdDSA'];
@@ -67,7 +72,25 @@ function constantTimeEqual(left, right) {
 
 function transactionCookieOptions(maxAge = TRANSACTION_MAX_AGE_SECONDS) {
   // Lax: the callback is a top-level GET navigation coming back from the Hub.
-  return { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge };
+  return { httpOnly: true, secure: SECURE_COOKIES, sameSite: 'lax', path: '/', maxAge };
+}
+
+// A callback with a code but no sign-in started here is a launch from the Hub
+// tile. Its code cannot be redeemed safely (the verifier is not ours), so the
+// app starts its own sign-in once; the Hub session makes that invisible.
+// Only when no sign-in was started in this browser: a pending sign-in whose state
+// does not match is an attack or a mix-up, never a launch.
+function launchRestartAllowed(request) {
+  try {
+    const cookies = cookie.parse(String(request?.headers?.cookie || ''));
+    return !cookies[LAUNCH_RESTART_COOKIE_NAME] && !cookies[TRANSACTION_COOKIE_NAME];
+  } catch {
+    return false;
+  }
+}
+
+function markLaunchRestart(response) {
+  response.append('Set-Cookie', cookie.serialize(LAUNCH_RESTART_COOKIE_NAME, '1', transactionCookieOptions(LAUNCH_RESTART_MAX_AGE_SECONDS)));
 }
 
 function startTransaction(response, nextPath) {
@@ -275,6 +298,7 @@ function getHubSsoClient() {
 }
 
 module.exports = {
+  LAUNCH_RESTART_COOKIE_NAME,
   TRANSACTION_COOKIE_NAME,
   clearTransaction,
   createHubSsoClient,
@@ -282,6 +306,8 @@ module.exports = {
   getHubSsoClient,
   hubSsoConfig,
   isAllowedHubEmail,
+  launchRestartAllowed,
+  markLaunchRestart,
   provisionHubUser,
   readTransaction,
   safeNextPath,

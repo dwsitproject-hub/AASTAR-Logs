@@ -135,6 +135,11 @@ All data lives in SQLite files under `backend/data/`.
 
 ## 4. Deployment architecture (3 servers)
 
+The staging environment (FE `172.28.92.56:3150`, BE `172.28.92.57:4150`, ApsaraDB database `astar_erp`, DWS Hub
+staging) follows this design with Docker containers on shared servers; its runbook is
+[DEPLOYMENT-STAGING.md](DEPLOYMENT-STAGING.md). The database roles are named `astar_erp_*` because the RDS
+instance is shared with other applications.
+
 ### 4.1 Server specification (recommended starting size)
 
 | Server | Service | Size (start) | OS / software | Inbound | Outbound |
@@ -234,8 +239,8 @@ module.exports = {
 | `PORT`, `HOST`, `TRUST_PROXY_HOPS` | backend | `3001`; the backend private IP (default `127.0.0.1`); `1` with Nginx only, `2` if an SLB sits in front without `real_ip` |
 | `JWT_SECRET` | backend | ≥ 32 random characters; rotation logs everyone out |
 | `FRONTEND_URL`, `CORS_ORIGINS` | backend | `https://erp.example.com` |
-| `DATABASE_URL`, `PG_POOL_MAX` | backend | `postgres://erp_app_login:<pw>@<rds-host>:5432/erp?sslmode=verify-full&sslrootcert=/opt/astar-erp/secrets/rds-ca.pem`; pool max 20 |
-| `MIGRATION_DATABASE_URL` | backend (deploy only) | Same form, owner account `erp_owner`; used only by `npm run db:migrate` |
+| `DATABASE_URL`, `PG_POOL_MAX` | backend | `postgres://astar_erp_app_login:<pw>@<rds-host>:5432/erp?sslmode=verify-full&sslrootcert=/opt/astar-erp/secrets/rds-ca.pem`; pool max 20 |
+| `MIGRATION_DATABASE_URL` | backend (deploy only) | Same form, owner account `astar_erp_owner`; used only by `npm run db:migrate` |
 | `DWS_HUB_URL`, `DWS_HUB_CLIENT_ID`, `DWS_HUB_REDIRECT_URI`, `DWS_HUB_ALLOWED_EMAIL_DOMAINS` | backend | see DWS-HUB-INTEGRATION §3 |
 | `SERVICE_ACCOUNTS_DIR` | backend | `/opt/astar-erp/secrets/service-accounts` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_DOMAIN` | backend | Legacy Google sign-in; unset to disable |
@@ -808,11 +813,11 @@ Relationship notes:
 
 | Role | Login user | Privileges |
 |---|---|---|
-| owner (RDS privileged account) | `erp_owner` | DDL and migrations only; not used by the application |
-| `erp_app` | `erp_app_login` (backend) | DML on `app`, `security`, `audit`; full control of `mirror` and `links` (staging and swap) |
-| `erp_read` | `erp_read_login` (reporting, support) | SELECT on all schemas |
+| owner (RDS privileged account) | `astar_erp_owner` | DDL and migrations only; not used by the application |
+| `astar_erp_app` | `astar_erp_app_login` (backend) | DML on `app`, `security`, `audit`; full control of `mirror` and `links` (staging and swap) |
+| `astar_erp_read` | `erp_read_login` (reporting, support) | SELECT on all schemas |
 
-Recommended role settings: `ALTER ROLE erp_app_login SET statement_timeout = '30s'` and `SET idle_in_transaction_session_timeout = '60s'`. Recommended instance parameters: `log_min_duration_statement = 1000`, `pg_stat_statements` enabled, `timezone = 'UTC'`.
+Recommended role settings: `ALTER ROLE astar_erp_app_login SET statement_timeout = '30s'` and `SET idle_in_transaction_session_timeout = '60s'`. Recommended instance parameters: `log_min_duration_statement = 1000`, `pg_stat_statements` enabled, `timezone = 'UTC'`.
 
 ---
 
