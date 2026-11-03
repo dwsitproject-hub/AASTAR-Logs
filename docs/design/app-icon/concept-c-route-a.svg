@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AASTAR Logistic (Export)">
+  <!-- Concept C "Route A": the A starts at a home port; its crossbar is a dotted sea lane leaving as an arrow. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2e383e"/>
+      <stop offset="1" stop-color="#1a2125"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <polyline points="146,404 256,116 366,404" fill="none" stroke="#e2664b" stroke-width="62" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- home port -->
+  <circle cx="146" cy="404" r="40" fill="#ffffff"/>
+  <circle cx="146" cy="404" r="17" fill="#e2664b"/>
+  <!-- sea lane -->
+  <line x1="200" y1="306" x2="392" y2="306" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-dasharray="0 42"/>
+  <polyline points="380,268 424,306 380,344" fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
