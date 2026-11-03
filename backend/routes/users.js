@@ -37,8 +37,13 @@ function validateUserInput(db, body, current = null) {
   if (current && (current.google_sub || current.hub_sub) && email !== currentEmail) {
     return { status: 400, error: 'A linked sign-in email cannot be changed' };
   }
-  if (isRecovery(email) && !isRecovery(currentEmail)) {
+  // The recovery account may be added (staging starts without it), but its email
+  // cannot be moved onto someone else's existing account.
+  if (current && isRecovery(email) && !isRecovery(currentEmail)) {
     return { status: 403, error: 'The recovery administrator email cannot be given to another user' };
+  }
+  if (!current && isRecovery(email) && !(role?.is_admin === 1 && isApproved)) {
+    return { status: 400, error: 'Add the recovery administrator with the Administrator role and approved' };
   }
   const emailOwner = db.prepare('SELECT id FROM users WHERE email = ? COLLATE NOCASE').get(email);
   if (emailOwner && emailOwner.id !== current?.id) return { status: 409, error: 'Another user already has this email' };

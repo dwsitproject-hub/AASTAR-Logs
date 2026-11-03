@@ -80,7 +80,7 @@ test('admins add, edit and delete users; the recovery account and their own admi
   assert.equal((await request(delegate, 'POST', '/users', { email: 'new.person@energi-up.com', role_id: viewers.id })).status, 409);
   assert.equal((await request(delegate, 'POST', '/users', { email: 'not-an-email', role_id: viewers.id })).status, 400);
   assert.equal((await request(delegate, 'POST', '/users', { email: 'x@kpn-corp.com', is_approved: true })).status, 400, 'approval needs a role');
-  assert.equal((await request(delegate, 'POST', '/users', { email: 'matthew.chiu@kpn-corp.com', role_id: viewers.id })).status, 403);
+  assert.equal((await request(delegate, 'POST', '/users', { email: 'matthew.chiu@kpn-corp.com', role_id: adminRole, is_approved: true })).status, 409, 'the recovery account already exists');
 
   // ...and deletes them.
   assert.equal((await request(delegate, 'DELETE', `/users/${addedId}`)).status, 200);

@@ -80,4 +80,17 @@ test('pending sessions are rejected and an admin approves a user by giving them 
   assert.equal(afterRestart.role_id, viewers.id);
   assert.deepEqual(JSON.parse(afterRestart.permissions), []);
   assert.deepEqual(JSON.parse(afterRestart.tab_permissions), ['/logistics/vessel-status']);
+
+  // A database without the recovery account (a fresh staging) can add it, as an approved Administrator only.
+  const { administratorRoleId } = require('../services/roles');
+  const add = body => fetch(`${baseUrl}/api/users`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${tokenFor(otherAdminId)}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'matthew.chiu@kpn-corp.com', username: 'Matthew', ...body }),
+  });
+  assert.equal((await add({ role_id: viewers.id, is_approved: true })).status, 400);
+  assert.equal((await add({ role_id: administratorRoleId(db), is_approved: false })).status, 400);
+  assert.equal((await add({ role_id: administratorRoleId(db), is_approved: true })).status, 201);
+  const recovery = db.prepare("SELECT is_admin, is_approved FROM users WHERE email = 'matthew.chiu@kpn-corp.com'").get();
+  assert.deepEqual({ ...recovery }, { is_admin: 1, is_approved: 1 });
 });
