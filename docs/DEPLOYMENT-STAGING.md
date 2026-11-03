@@ -162,6 +162,7 @@ Hub Admin → **Applications** → add:
 | `oauth_client_id` | `astar-erp-staging` |
 | `oidc_redirect_uris` | `http://172.28.92.56:3150/api/auth/sso/callback` (exact, no trailing slash) |
 | Target / launch URL | `http://172.28.92.56:3150/api/auth/sso/login` |
+| Icon | upload `docs/design/app-icon/dws-hub-tile-512.png` (AASTAR Logistic (Export) app icon) |
 
 The Hub uses public clients with PKCE (no client secret). The values must match `DWS_HUB_CLIENT_ID` and
 `DWS_HUB_REDIRECT_URI` in step 6.2 exactly.
@@ -303,7 +304,7 @@ If RDS SSL is on: download the RDS CA, put it in `deploy/staging/backend/secrets
 `?sslmode=verify-full&sslrootcert=/app/secrets/rds-ca.pem`.
 
 ```bash
-grep -n REPLACE_ME .env.staging || echo "all values set"
+grep -nE '^[^#]*REPLACE_ME' .env.staging || echo "all values set"
 ```
 
 ### 6.3 Google key file

@@ -22,7 +22,8 @@ PORT="${BACKEND_HOST_PORT:-4150}"
 CONTAINER=astar-erp-backend-staging
 
 [ -f .env.staging ] || { echo "Missing .env.staging - run: cp .env.staging.example .env.staging" >&2; exit 1; }
-if grep -n 'REPLACE_ME' .env.staging; then echo "Fill in the REPLACE_ME values above in .env.staging first." >&2; exit 1; fi
+# Settings only: comment lines may mention the placeholder.
+if grep -nE '^[^#]*REPLACE_ME' .env.staging; then echo "Fill in the REPLACE_ME values above in .env.staging first." >&2; exit 1; fi
 ls service-accounts/*.json >/dev/null 2>&1 || echo "WARNING: no Google key in service-accounts/ - the sheet sync cannot run."
 
 if [ "$PULL" = 1 ]; then git -C ../../.. pull --ff-only; fi
