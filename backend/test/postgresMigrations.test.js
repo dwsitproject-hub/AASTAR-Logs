@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { checksumOf, listMigrations, migrate, migrationStatus, MIGRATIONS_DIR } = require('../db/postgres/migrate');
+const { checksumOf, connectionConfig, listMigrations, migrate, migrationStatus, MIGRATIONS_DIR } = require('../db/postgres/migrate');
 
 function tempDir(t, files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'erp-migrations-'));
@@ -33,6 +33,27 @@ test('badly named and duplicate migration files are rejected', t => {
   assert.throws(() => listMigrations(tempDir(t, { '0001_Upper-Case.sql': '' })), error => error.code === 'MIGRATION_BAD_NAME');
   assert.throws(() => listMigrations(tempDir(t, { '0000_reserved.sql': '' })), error => error.code === 'MIGRATION_BAD_NAME');
   assert.throws(() => listMigrations(tempDir(t, { '0001_a.sql': '', '0001_b.sql': '' })), error => error.code === 'MIGRATION_DUPLICATE');
+});
+
+test('a password with / ? # gets a clear error, or works unencoded through MIGRATION_DATABASE_PASSWORD', () => {
+  const host = 'pgm-example.pgsql.ap-southeast-5.rds.aliyuncs.com';
+  assert.throws(
+    () => connectionConfig({ MIGRATION_DATABASE_URL: `postgres://astar_erp_owner:Ab/c?d#e@${host}:5432/astar_erp?sslmode=disable` }),
+    error => error.code === 'MIGRATION_BAD_URL' && !error.message.includes('Ab/c'),
+  );
+  const encoded = connectionConfig({ MIGRATION_DATABASE_URL: `postgres://astar_erp_owner:Ab%2Fc%3Fd%23e@${host}:5432/astar_erp` });
+  assert.ok(encoded.connectionString, 'an encoded URL is passed through unchanged');
+
+  const separate = connectionConfig({
+    MIGRATION_DATABASE_URL: `postgres://astar_erp_owner@${host}:5432/astar_erp?sslmode=disable`,
+    MIGRATION_DATABASE_PASSWORD: 'Ab/c?d#e',
+  });
+  assert.equal(separate.connectionString, undefined);
+  assert.equal(separate.password, 'Ab/c?d#e');
+  assert.equal(separate.host, host);
+  assert.equal(separate.user, 'astar_erp_owner');
+  assert.equal(separate.database, 'astar_erp');
+  assert.equal(separate.ssl, false);
 });
 
 test('the shipped migrations parse and contain no explicit transaction control', () => {

@@ -83,7 +83,7 @@ git push origin SIT
 - [ ] DWS Hub **Admin** on the staging Hub (to register the app, get the SDK key and set up Sentinel).
 - [ ] The Google key file `service-account-staging.json` for `aastar-logs-staging@…` (on your PC in
       `D:\Claude\AASTAR Logs\backend\service-accounts\`). Carry it to the backend server only; never commit it.
-- [ ] A strong password for `astar_erp_owner` (password manager). Avoid `@ : / # ?` or URL-encode them later.
+- [ ] A strong password for `astar_erp_owner` (password manager). Any characters are fine except a single quote `'`.
 - [ ] Your **DWS Hub email** (your first Hub sign-in links to the administrator created with it).
 
 The 5 spreadsheet copies are already shared with `aastar-logs-staging@…` as Editor.
@@ -297,7 +297,8 @@ nano .env.staging
 | `DWS_HUB_REDIRECT_URI` | `http://172.28.92.56:3150/api/auth/sso/callback` (as registered in 4.2) |
 | `DWS_HUB_ALLOWED_EMAIL_DOMAINS` | empty (any Hub account may request access; an ERP admin approves) or e.g. `kpn-corp.com,energi-up.com` |
 | `SHEETS_SERVICE_ACCOUNT_EMAIL`, `SHEET_ID_*` | pre-filled with the staging copies; they only seed **Admin → Sheets Config** on the first start |
-| `MIGRATION_DATABASE_URL` | replace `REPLACE_ME` with the `astar_erp_owner` password (URL-encoded) |
+| `MIGRATION_DATABASE_URL` | pre-filled, without a password (owner account, host, database, `sslmode=disable`) |
+| `MIGRATION_DATABASE_PASSWORD` | the `astar_erp_owner` password **inside the single quotes**, as is (no URL encoding; the quotes keep `$` literal) |
 
 If RDS SSL is on: download the RDS CA, put it in `deploy/staging/backend/secrets/rds-ca.pem`, add
 `- ./secrets:/app/secrets:ro` under `volumes` in `docker-compose.yml`, and end the URL with
@@ -515,7 +516,8 @@ group rules and the deploy keys, and optionally `DROP DATABASE astar_erp` and th
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `deploy.sh`: `Fill in the REPLACE_ME values` | `.env.staging` incomplete | 6.2 |
-| Migration: `password authentication failed` / timeout | owner password, URL encoding, whitelist | 5.2, 6.2; `--skip-migrate` deploys the app meanwhile |
+| Migration: `Invalid URL` or `The database URL is not a valid URL` | the password is inside `MIGRATION_DATABASE_URL` and contains `/ ? #` | take it out of the URL and put it in `MIGRATION_DATABASE_PASSWORD='…'` (6.2) |
+| Migration: `password authentication failed` / timeout | owner password, whitelist | 5.2, 6.2; `--skip-migrate` deploys the app meanwhile |
 | Migration: `permission denied for database astar_erp` | console path without the GRANT | run `GRANT ALL ON DATABASE astar_erp TO astar_erp_owner;` as the privileged account |
 | Migration: `server does not support SSL` / `SSL required` | `sslmode` does not match the RDS SSL setting | `sslmode=disable` (SSL off) or the CA setup in 6.2 (SSL on) |
 | Migration: `MIGRATION_CHECKSUM_MISMATCH` | an applied migration file was edited | never edit applied files; add a new numbered file |
@@ -579,7 +581,7 @@ To use other ports, change them consistently: FE `.env` `FRONTEND_HOST_PORT`; BE
 | `SESSION_COOKIE_SECURE` | `false` | HTTP staging only |
 | `DWS_HUB_*` | see 6.2 | `DWS_HUB_SSO_ENABLED=0` hides the button |
 | `SHEETS_SERVICE_ACCOUNT_EMAIL`, `SHEET_ID_*` | staging copies | seed Admin → Sheets Config once |
-| `MIGRATION_DATABASE_URL` | owner account URL | migrations only |
+| `MIGRATION_DATABASE_URL`, `MIGRATION_DATABASE_PASSWORD` | owner account URL (no password) and its password | migrations only |
 | `MATTHEW_EMAIL` | `matthew.chiu@kpn-corp.com` | recovery administrator |
 | `AISSTREAM_API_KEY`, `SMTP_*`, `USER_ACTIVITY_REPORT_TO` | optional | live AIS feed, activity report e-mail |
 

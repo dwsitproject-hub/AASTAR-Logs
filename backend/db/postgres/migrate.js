@@ -12,6 +12,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { parse: parseConnectionString } = require('pg-connection-string');
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations');
 const FILE_PATTERN = /^(\d{4})_([a-z0-9]+(?:_[a-z0-9]+)*)\.sql$/;
@@ -145,7 +146,23 @@ function connectionConfig(env = process.env, applicationName = 'astar-erp-migrat
   if (!connectionString) {
     throw migrationError('Set MIGRATION_DATABASE_URL (owner account) or DATABASE_URL', 'MIGRATION_NO_DATABASE');
   }
-  return { connectionString, application_name: applicationName, connectionTimeoutMillis: 15000 };
+  let parsed;
+  try {
+    parsed = parseConnectionString(connectionString);
+  } catch {
+    // Never echo the URL: it usually contains the password.
+    throw migrationError(
+      'The database URL is not a valid URL. In the password, / ? # must be URL-encoded (%2F %3F %23); '
+        + 'or leave the password out of the URL and set MIGRATION_DATABASE_PASSWORD.',
+      'MIGRATION_BAD_URL',
+    );
+  }
+  const base = { application_name: applicationName, connectionTimeoutMillis: 15000 };
+  // A separate password needs no URL encoding. pg lets a connectionString win over
+  // explicit fields, so the parsed settings are passed instead of the string.
+  const password = String(env.MIGRATION_DATABASE_PASSWORD || '');
+  if (password) return { ...parsed, password, ...base };
+  return { connectionString, ...base };
 }
 
 module.exports = {
