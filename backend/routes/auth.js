@@ -46,6 +46,7 @@ const {
 
 const router = express.Router();
 const DECOY_PATH = '/atlas/royal-continent';
+const RECOVERY_EMAIL = String(process.env.MATTHEW_EMAIL || 'matthew.chiu@kpn-corp.com').trim().toLowerCase();
 const GOOGLE_ALLOWED_DOMAIN = String(process.env.GOOGLE_ALLOWED_DOMAIN || 'kpn-corp.com').trim().toLowerCase();
 const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || '').trim();
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
@@ -71,6 +72,8 @@ function publicUser(user) {
     email: user.email || null,
     hub_sub: user.hub_sub || null,
     is_admin: user.is_admin === 1,
+    // The recovery administrator (MATTHEW_EMAIL): IP Security and the activity report.
+    is_recovery: String(user.email || '').trim().toLowerCase() === RECOVERY_EMAIL,
     is_approved: user.is_approved === 1,
     permissions: parseJsonList(user.permissions),
     tab_permissions: parseJsonList(user.tab_permissions),

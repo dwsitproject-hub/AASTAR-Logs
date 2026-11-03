@@ -380,19 +380,28 @@ Sizes: XS < ½ day, S ≈ 1 day, M 2–3 days, L 4–6 days. The total, includin
 
 | L2 | Step | Component | Behaviour |
 |---|---|---|---|
-| 1 | Admin | `requireAdmin` | `is_admin` → user list and approval, sheet config, refresh, data browser, test tools |
-| 2 | Owner | `requireMatthew` | Email = `MATTHEW_EMAIL` → manage admins, change linked emails, delete users, IP rules, activity report |
-| 3 | Invariants | `db/database.js` start-up and `routes/users.js` | The owner always stays an approved admin; `admin` cannot be granted through `permissions`; an admin needs a linked identity (Hub or Google) |
+| 1 | Admin | `requireAdmin` | Members of the built-in **Administrator** role (`is_admin`) → add, edit and delete users (any user, other admins included), roles, sheet config, refresh, data browser, test tools |
+| 2 | Recovery owner | `requireMatthew` | Email = `MATTHEW_EMAIL` → IP rules, activity report |
+| 3 | Invariants | `services/roles.js` start-up and `routes/users.js` | The recovery account always has the Administrator role and stays approved; nobody can delete it, delete themself or remove their own admin role; the Admin Panel comes only with the Administrator role |
 
-**L1-02.3 Approve or modify a user** (`PUT /api/users/:id`)
+**L1-02.3 Roles** (`/api/roles`, Admin → Roles; `services/roles.js`)
 
 | L2 | Validation / action |
 |---|---|
-| 1 | Target exists (404). The email is normalised; an unchanged Hub email from another domain is accepted. |
-| 2 | Non-owner cannot edit admins, the owner, themself, or grant admin (403). Non-owner cannot change the email (403). |
-| 3 | Admin requires a linked identity and approval (400). `admin` in permissions is rejected (400). A linked email cannot change (400). |
-| 4 | Approval requires at least one page (400). Cannot remove own admin role or approval (400). The owner must stay an approved admin (400). |
-| 5 | UPDATE with `auth_version = auth_version + 1`, which revokes the user's sessions on their next request. |
+| 1 | Every user has one role; the role's pages are written onto its members (`is_admin`, `permissions`, `tab_permissions`), so page checks, sign-in and realtime read the user row unchanged and a role edit applies on the next request. |
+| 2 | Name 1–60 characters, unique (case-insensitive) (409). At least one page (400). Only known pages (`config/pages.js`, kept equal to the sidebar by a test); `admin` is refused (400). |
+| 3 | The built-in Administrator role cannot be edited or deleted (403). A role with members cannot be deleted (409). |
+| 4 | First start after the upgrade: admins get Administrator; users with identical access share one generated role (e.g. "Logistics (2 pages)"); pending users stay without a role. |
+
+**L1-02.4 Add, approve, modify or delete a user** (`POST`, `PUT /api/users/:id`, `DELETE /api/users/:id`)
+
+| L2 | Validation / action |
+|---|---|
+| 1 | Add: a valid sign-in email (any domain; DWS Hub or Google links the account on first sign-in), unique name and email (409), role required to approve (400). |
+| 2 | Edit: target exists (404); a linked email cannot change (400); the recovery email cannot be given to another user (403). |
+| 3 | The recovery account and the admin's own account must stay approved with the Administrator role (400). |
+| 4 | UPDATE with `auth_version = auth_version + 1`, which revokes the user's sessions on their next request. |
+| 5 | Delete: not oneself (400), not the recovery account (403). |
 
 **L1-02.4 Realtime authorization:** `realtime.js` `canReceive` delivers `data.updated` only to sockets whose user can open at least one page affected by the resource.
 
@@ -611,12 +620,24 @@ Relationship notes:
 | email | text | Y | UK (lower) | Sign-in email; immutable once a Hub or Google identity is linked |
 | google_sub | text | Y | UK | Google subject (legacy sign-in) |
 | hub_sub | text | Y | UK | DWS Hub OIDC `sub`; canonical identity for Hub sign-in and SDK `identify` |
-| is_admin | boolean | N | | Administrator role (CHECK: an admin must be approved) |
+| role_id | bigint | Y | FK → app.roles | The user's one role (migration 0003); NULL while pending without a role |
+| is_admin | boolean | N | | Written from the role: true for the Administrator role (CHECK: an admin must be approved) |
 | is_approved | boolean | N | | Access approved; false = pending |
-| permissions | jsonb (array) | N | | Whole-department grants: `commercial`, `chartering`, `finance` |
-| tab_permissions | jsonb (array) | N | | Exact page paths, e.g. `/logistics/vessel-update` |
+| permissions | jsonb (array) | N | | Written from the role: whole-department grants, e.g. `finance` |
+| tab_permissions | jsonb (array) | N | | Written from the role: exact page paths, e.g. `/logistics/vessel-update` |
 | auth_version | integer | N | | Incremented on every access change; sessions carrying an older value are rejected |
 | created_at, updated_at | timestamptz | N | | Audit timestamps |
+
+**app.roles**: page access per role (Admin → Roles, migration 0003).
+
+| Column | Type | Null | Key | Description |
+|---|---|---|---|---|
+| id | bigint identity | N | PK | Role ID |
+| name | text | N | UK (lower) | 1–60 characters |
+| description | text | N | | Optional note shown in Admin → Roles |
+| is_admin, is_system | boolean | N | UK (is_system) | True only for the built-in Administrator role (every page + Admin Panel; locked) |
+| permissions, tab_permissions | jsonb (array) | N | | The role's pages, copied onto its members |
+| created_at, updated_at, updated_by | timestamptz, text | N | | Audit fields |
 
 **app.user_sessions** (planned, CODE-REVIEW M2)
 
@@ -975,7 +996,7 @@ Verification is the staging load test (`backend/scripts/load-test.js`): 25 virtu
 | Level | Scope | Tooling |
 |---|---|---|
 | Unit | Business rules (export summary, weekly ops, demurrage, vessel status, open-shipments basis, live vessels), mutation queue, session cookie, login security | `node:test` (backend 93, frontend 22) |
-| Integration | DWS Hub OIDC against a mock Hub with real RS256 keys (15 cases); account approval; delegated admin; page authorisation; websocket security | `node:test` + in-process Express |
+| Integration | DWS Hub OIDC against a mock Hub with real RS256 keys (15 cases); account approval; user management and roles; page authorisation; websocket security | `node:test` + in-process Express |
 | Database (target) | Schema migrations and repositories on `postgres:18` | Docker container in CI |
 | Performance | 25–50 virtual users, read endpoints; concurrent creates | `backend/scripts/load-test.js` |
 | Security | Dependency audit, header check, SSO negative paths, IP lockout | `npm audit`, tests |

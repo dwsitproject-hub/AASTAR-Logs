@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AnimatedCollapse from './AnimatedCollapse';
+import AppLogo from './AppLogo';
 
 const ICON = (path) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -125,16 +126,11 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         borderBottom: '1px solid var(--border-sidebar)',
         gap: 11
       }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: 9,
-          background: 'var(--primary)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontWeight: 700, fontSize: 15, flexShrink: 0,
-          letterSpacing: 0.2
-        }}>A</div>
+        <AppLogo size={32} />
         {!collapsed && (
-          <span style={{ color: 'var(--text-sidebar)', fontWeight: 700, fontSize: 15, whiteSpace: 'nowrap', letterSpacing: 0.3 }}>
-            Astar ERP
+          <span style={{ color: 'var(--text-sidebar)', whiteSpace: 'nowrap', lineHeight: 1.15 }}>
+            <span style={{ display: 'block', fontWeight: 700, fontSize: 14, letterSpacing: 0.3 }}>AASTAR Logistic</span>
+            <span style={{ display: 'block', fontSize: 11.5, opacity: 0.75 }}>(Export)</span>
           </span>
         )}
       </div>

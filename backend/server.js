@@ -12,6 +12,7 @@ const usersRoutes = require('./routes/users');
 const sheetsRoutes = require('./routes/sheets');
 const dataRoutes = require('./routes/data');
 const spreadsheetSourcesRoutes = require('./routes/spreadsheetSources');
+const rolesRoutes = require('./routes/roles');
 const { initSpreadsheetSources } = require('./services/spreadsheetSources');
 const vesselSlotsRoutes = require('./routes/vesselSlots');
 const appsScriptTestRoutes = require('./routes/appsScriptTest');
@@ -185,6 +186,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/sheets', sheetsRoutes);
 app.use('/api/data', dataRoutes);
 app.use('/api/spreadsheet-sources', spreadsheetSourcesRoutes);
+app.use('/api/roles', rolesRoutes);
 app.use('/api/vessel-slots', vesselSlotsRoutes);
 app.use('/api/test/apps-script-sheet', appsScriptTestRoutes);
 

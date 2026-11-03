@@ -7,6 +7,7 @@
 // an existing google_sub / hub_sub link on the account is left untouched.
 require('dotenv').config();
 const { getDb, initDb } = require('../db/database');
+const { administratorRoleId } = require('../services/roles');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,11 +17,14 @@ function seedAdmin(db, { email, username = '' }) {
   const name = String(username || '').trim().slice(0, 120) || normalizedEmail;
 
   return db.transaction(() => {
+    const adminRoleId = administratorRoleId(db);
     const existing = db.prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE').get(normalizedEmail);
     if (existing) {
       db.prepare(`
-        UPDATE users SET is_admin = 1, is_approved = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-      `).run(existing.id);
+        UPDATE users SET role_id = ?, is_admin = 1, is_approved = 1, permissions = '[]', tab_permissions = '[]',
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(adminRoleId, existing.id);
       return { created: false, user: db.prepare('SELECT * FROM users WHERE id = ?').get(existing.id) };
     }
     if (db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(name)) {
@@ -28,10 +32,10 @@ function seedAdmin(db, { email, username = '' }) {
     }
     const result = db.prepare(`
       INSERT INTO users (
-        username, email, password, is_admin, is_approved,
+        username, email, password, role_id, is_admin, is_approved,
         permissions, tab_permissions, auth_version
-      ) VALUES (?, ?, NULL, 1, 1, '[]', '[]', 1)
-    `).run(name, normalizedEmail);
+      ) VALUES (?, ?, NULL, ?, 1, 1, '[]', '[]', 1)
+    `).run(name, normalizedEmail, adminRoleId);
     return { created: true, user: db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid) };
   })();
 }

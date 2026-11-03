@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { API_BASE_URL, redirectToDecoy } from '../services/api';
+import AppLogo, { APP_NAME } from '../components/AppLogo';
 
 const GOOGLE_SCRIPT_ID = 'google-identity-services';
 
@@ -9,7 +10,7 @@ const GOOGLE_SCRIPT_ID = 'google-identity-services';
 const HUB_SSO_ERRORS = {
   pending: 'Your DWS Hub account is verified and awaiting ERP access approval. Please ask an ERP administrator to approve your access.',
   review_required: 'This DWS Hub account needs administrator review before it can be used here.',
-  identity_not_allowed: 'This DWS Hub account is not allowed to use Astar ERP.',
+  identity_not_allowed: 'This DWS Hub account is not allowed to use AASTAR Logistic (Export).',
   session_expired: 'Your sign-in took too long or was started elsewhere. Please sign in again.',
   token_invalid: 'DWS Hub sign-in could not be verified. Please try again.',
   hub_denied: 'Sign-in was cancelled or refused by DWS Hub.',
@@ -181,13 +182,10 @@ export default function Login() {
         padding: '42px 40px', width: '100%', maxWidth: 400,
       }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{
-            width: 54, height: 54, borderRadius: 10,
-            background: 'var(--primary)', color: '#fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 800, fontSize: 23, margin: '0 auto 12px',
-          }}>A</div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-main)' }}>Astar ERP</h2>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+            <AppLogo size={64} />
+          </div>
+          <h2 style={{ fontSize: 21, fontWeight: 700, color: 'var(--text-main)' }}>{APP_NAME}</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 4 }}>Sign in to your account</p>
         </div>
 
