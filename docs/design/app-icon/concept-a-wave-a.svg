@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AASTAR Logistic (Export)">
+  <!-- Concept A "Outbound A": the A's crossbar is a sea wave that leaves the letter as an export arrow. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#cf5e47"/>
+      <stop offset="1" stop-color="#a3402d"/>
+    </linearGradient>
+    <!-- cuts a clear gap into the letter around the wave -->
+    <mask id="gap" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#ffffff"/>
+      <path d="M 150 318 C 196 288, 236 344, 280 314 S 352 300, 400 300" fill="none" stroke="#000000" stroke-width="66" stroke-linecap="round"/>
+      <polyline points="370,268 404,300 370,332" fill="none" stroke="#000000" stroke-width="66" stroke-linecap="round" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <polyline points="142,408 256,112 370,408" fill="none" stroke="#ffffff" stroke-width="68" stroke-linecap="round" stroke-linejoin="round" mask="url(#gap)"/>
+  <path d="M 150 318 C 196 288, 236 344, 280 314 S 352 300, 400 300" fill="none" stroke="#ffe0bd" stroke-width="32" stroke-linecap="round"/>
+  <polyline points="370,268 404,300 370,332" fill="none" stroke="#ffe0bd" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -17,6 +17,8 @@ const GOOGLE_REQUEST_TIMEOUT_MS = Math.max(
 const credentialsByEmail = new Map();
 const lastHashes = new Map();
 const VESSEL_LINK_DATABASES = new Set(['DB1', 'DB2', 'DB3', 'DB4', 'DB5', 'DB6', 'DB10']);
+// Outcome of the latest refresh per database, for Admin -> Sheets Config.
+const databaseSyncState = new Map();
 let timer = null;
 let running = false;
 
@@ -466,6 +468,8 @@ async function refreshBulkDatabases() {
     loadCredentials();
     const groups = new Map();
     for (const definition of DATA_DATABASES) {
+      // Switched off for this stack (SHEET_ID_*=none): reported unavailable below.
+      if (!definition.sheetId) continue;
       const key = `${definition.sheetId}::${definition.serviceAccountEmail}`;
       if (!groups.has(key)) groups.set(key, { sheetId: definition.sheetId, email: definition.serviceAccountEmail, sources: new Map() });
       for (const source of definition.sources) groups.get(key).sources.set(sourceKey(source), source);
@@ -567,8 +571,19 @@ async function refreshBulkDatabases() {
         source: 'google-sheets',
       });
     }
+    const syncedAt = new Date().toISOString();
+    for (const result of results) {
+      const definition = DATA_DATABASES.find(item => item.name === result.name);
+      const failure = failures.find(item => item.sheetId === definition?.sheetId && item.email === definition?.serviceAccountEmail);
+      databaseSyncState.set(result.name, {
+        at: syncedAt,
+        ok: !result.unavailable,
+        changed: !result.unavailable && !result.unchanged,
+        error: result.unavailable ? (definition?.sheetId ? (failure?.error || result.reason) : 'Switched off') : '',
+      });
+    }
     return {
-      syncedAt: new Date().toISOString(),
+      syncedAt,
       groups: groups.size,
       failures,
       matchIdRepairs,
@@ -1115,6 +1130,40 @@ function bulkSyncStatus() {
   return { ...syncStatus, running, intervalMs: BULK_SYNC_INTERVAL_MS };
 }
 
+function databaseSyncStates() {
+  return Object.fromEntries(databaseSyncState);
+}
+
+// After a source's settings change, its last outcome no longer describes it.
+function forgetDatabaseSyncState(names) {
+  for (const name of names) databaseSyncState.delete(name);
+}
+
+// Emails of the service-account keys on this server (never the keys themselves).
+function availableServiceAccounts() {
+  try {
+    loadCredentials();
+  } catch {
+    return [];
+  }
+  return [...credentialsByEmail.keys()].sort();
+}
+
+// Connection check for Admin -> Sheets Config: can this account open the
+// spreadsheet, and which tabs does it have?
+async function inspectSpreadsheet(sheetId, serviceAccountEmail) {
+  loadCredentials();
+  const sheets = google.sheets({ version: 'v4', auth: authFor(serviceAccountEmail) });
+  const response = await sheets.spreadsheets.get({
+    spreadsheetId: sheetId,
+    fields: 'properties.title,sheets.properties.title',
+  }, { timeout: GOOGLE_REQUEST_TIMEOUT_MS });
+  return {
+    title: response.data.properties?.title || '',
+    tabs: (response.data.sheets || []).map(sheet => sheet.properties?.title).filter(Boolean),
+  };
+}
+
 module.exports = {
   DATA_DIR,
   DATA_DATABASES,
@@ -1133,5 +1182,9 @@ module.exports = {
   startBulkDataSync,
   stopBulkDataSync,
   bulkSyncStatus,
+  databaseSyncStates,
+  forgetDatabaseSyncState,
+  availableServiceAccounts,
+  inspectSpreadsheet,
   dbPath,
 };

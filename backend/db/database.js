@@ -314,6 +314,8 @@ function initDb() {
     }
   } catch (e) { console.error('ordinary-user admin permission cleanup skipped:', e.message); }
 
+  // Roles (Admin -> Roles): converts existing access once, keeps the recovery account an administrator.
+  require('../services/roles').initRoles(db, { recoveryEmail: MATTHEW_EMAIL });
 }
 
 module.exports = { getDb, initDb };

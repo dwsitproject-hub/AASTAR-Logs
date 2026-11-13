@@ -99,7 +99,7 @@ test('DWS Hub OIDC sign-in: PKCE, JWKS verification, approval gate and identity 
   const { initDb, getDb } = require('../db/database');
   const authRoutes = require('../routes/auth');
   const { SESSION_COOKIE_NAME } = require('../services/sessionCookie');
-  const { TRANSACTION_COOKIE_NAME, safeNextPath } = require('../services/hubSso');
+  const { LAUNCH_RESTART_COOKIE_NAME, TRANSACTION_COOKIE_NAME, safeNextPath } = require('../services/hubSso');
   const { stopUserActivity } = require('../services/userActivity');
   const { getLoginSecurityStore } = require('../services/loginSecurity');
 
@@ -212,11 +212,23 @@ test('DWS Hub OIDC sign-in: PKCE, JWKS verification, approval gate and identity 
     assert.equal(cookiePair(callback.headers.getSetCookie(), SESSION_COOKIE_NAME), '');
   });
 
-  await t.test('a callback without the transaction cookie (replay or Hub-initiated) is rejected', async () => {
+  await t.test('a Hub tile launch restarts a normal sign-in once and never redeems the foreign code', async () => {
     const start = await get('/api/auth/sso/login');
+    const transactionCookie = cookiePair(start.headers.getSetCookie(), TRANSACTION_COOKIE_NAME);
     const { code, state } = hub.authorize(start.headers.get('location'), newcomer);
-    const callback = await get(`/api/auth/sso/callback?code=${code}&state=${state}`);
-    assert.equal(callback.headers.get('location'), '/login?sso_error=session_expired');
+
+    const launch = await get(`/api/auth/sso/callback?code=${code}&state=${state}&code_verifier=from-the-hub`);
+    assert.equal(launch.headers.get('location'), '/api/auth/sso/login');
+    const launchCookie = cookiePair(launch.headers.getSetCookie(), LAUNCH_RESTART_COOKIE_NAME);
+    assert.ok(launchCookie, 'the restart is remembered for a short time');
+    assert.equal(cookiePair(launch.headers.getSetCookie(), SESSION_COOKIE_NAME), '');
+
+    const second = await get(`/api/auth/sso/callback?code=${code}&state=${state}`, launchCookie);
+    assert.equal(second.headers.get('location'), '/login?sso_error=session_expired', 'no restart loop');
+
+    // The code was never sent to the Hub: it is still redeemable by the sign-in that started it.
+    const own = await get(`/api/auth/sso/callback?code=${code}&state=${state}`, transactionCookie);
+    assert.notEqual(own.headers.get('location'), '/login?sso_error=token_invalid');
   });
 
   await t.test('a reused authorization code is refused by the Hub', async () => {

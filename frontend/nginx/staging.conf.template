@@ -1,0 +1,49 @@
+# Staging frontend server (deploy/staging/frontend): serves the built pages and
+# proxies /api and /api/ws to the backend server on the private network.
+# ${BACKEND_URL} is filled in when the container starts (nginx image templates);
+# nginx's own $variables are left alone because they are not environment variables.
+server {
+  listen 80;
+  server_name _;
+  server_tokens off;
+
+  root /usr/share/nginx/html;
+  index index.html;
+
+  add_header X-Content-Type-Options nosniff always;
+  add_header Referrer-Policy strict-origin-when-cross-origin always;
+  add_header X-Frame-Options SAMEORIGIN always;
+
+  gzip on;
+  gzip_types application/json application/javascript text/css image/svg+xml;
+
+  location = /healthz { access_log off; default_type text/plain; return 200 "ok\n"; }
+
+  location = /site.webmanifest { default_type application/manifest+json; add_header Cache-Control "no-cache"; }
+
+  location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; try_files $uri =404; }
+
+  location = /api/ws {
+    proxy_pass ${BACKEND_URL};
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;   # one trusted hop: TRUST_PROXY_HOPS=1 on the backend
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 1h;
+  }
+
+  location /api/ {
+    proxy_pass ${BACKEND_URL};
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 90s;                          # Google Sheets writes can take up to 60 s
+    client_max_body_size 200k;
+  }
+
+  location / { try_files $uri /index.html; add_header Cache-Control "no-cache"; }
+}

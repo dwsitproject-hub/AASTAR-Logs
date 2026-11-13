@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { API_BASE_URL, redirectToDecoy } from '../services/api';
+import AppLogo, { APP_NAME } from '../components/AppLogo';
 
 const GOOGLE_SCRIPT_ID = 'google-identity-services';
 
@@ -9,7 +10,7 @@ const GOOGLE_SCRIPT_ID = 'google-identity-services';
 const HUB_SSO_ERRORS = {
   pending: 'Your DWS Hub account is verified and awaiting ERP access approval. Please ask an ERP administrator to approve your access.',
   review_required: 'This DWS Hub account needs administrator review before it can be used here.',
-  identity_not_allowed: 'This DWS Hub account is not allowed to use Astar ERP.',
+  identity_not_allowed: 'This DWS Hub account is not allowed to use AASTAR Logistic (Export).',
   session_expired: 'Your sign-in took too long or was started elsewhere. Please sign in again.',
   token_invalid: 'DWS Hub sign-in could not be verified. Please try again.',
   hub_denied: 'Sign-in was cancelled or refused by DWS Hub.',
@@ -96,7 +97,8 @@ export default function Login() {
   const [remember, setRemember] = useState(true);
   const [googleConfig, setGoogleConfig] = useState(null);
   const [hubSsoEnabled, setHubSsoEnabled] = useState(false);
-  const { googleLogin } = useAuth();
+  const [devLoginConfig, setDevLoginConfig] = useState(null);
+  const { googleLogin, devLogin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const nextPath = typeof location.state?.from === 'string' ? location.state.from : '/dashboard';
@@ -115,6 +117,7 @@ export default function Login() {
       setGoogleConfig(response.data?.google || null);
       // The desktop shell cannot complete a browser redirect flow, so it keeps Google sign-in.
       setHubSsoEnabled(Boolean(response.data?.hubSso?.enabled) && !window.erpDesktop);
+      setDevLoginConfig(response.data?.devLogin?.enabled ? response.data.devLogin : null);
     }).catch(() => {});
     return () => { active = false; };
   }, []);
@@ -151,6 +154,18 @@ export default function Login() {
     }
   }, [completeLogin, googleLogin, remember]);
 
+  const handleDevLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      completeLogin(await devLogin());
+    } catch (err) {
+      setError(err.response?.data?.error || 'Local sign-in failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const inputStyle = {
     width: '100%', padding: '10px 14px', borderRadius: 8,
     border: '1px solid var(--border)', fontSize: 14,
@@ -167,15 +182,24 @@ export default function Login() {
         padding: '42px 40px', width: '100%', maxWidth: 400,
       }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{
-            width: 54, height: 54, borderRadius: 10,
-            background: 'var(--primary)', color: '#fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 800, fontSize: 23, margin: '0 auto 12px',
-          }}>A</div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-main)' }}>Astar ERP</h2>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+            <AppLogo size={64} />
+          </div>
+          <h2 style={{ fontSize: 21, fontWeight: 700, color: 'var(--text-main)' }}>{APP_NAME}</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 4 }}>Sign in to your account</p>
         </div>
+
+        {devLoginConfig && (
+          <div style={{ marginBottom: 20, padding: 12, borderRadius: 8, border: '1px dashed #f59e0b', background: '#fffbeb' }}>
+            <div style={{ fontSize: 12, color: '#92400e', marginBottom: 8 }}>Local development stack</div>
+            <button type="button" onClick={handleDevLogin} disabled={loading} style={{
+              width: '100%', padding: 10, borderRadius: 8, border: '1px solid #f59e0b',
+              background: '#fff', color: '#92400e', fontSize: 14, fontWeight: 600,
+            }}>
+              Sign in as {devLoginConfig.email}
+            </button>
+          </div>
+        )}
 
         {hubSsoEnabled && (
           <>

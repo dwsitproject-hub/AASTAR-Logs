@@ -55,7 +55,7 @@ export default function TopBar({ sidebarWidth }) {
   const title = TITLES[pathname] || 'ERP';
   const [logsState, setLogsState] = useState('idle');
   const logsResetTimer = useRef(null);
-  const canSendLogs = String(user?.username || '').trim().toLowerCase() === 'matthew';
+  const canSendLogs = Boolean(user?.is_recovery);
 
   useEffect(() => () => {
     if (logsResetTimer.current) clearTimeout(logsResetTimer.current);

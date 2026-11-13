@@ -5,10 +5,14 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.*.example
 *.pem
 *.key
 backend/service-accounts/
 backend/secrets/
+deploy/**/service-accounts/
+deploy/**/secrets/
+deploy/**/backups/
 
 # Runtime data: SQLite databases, mirrors, backups of production data
 backend/data/

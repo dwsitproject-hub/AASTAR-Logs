@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AASTAR Logistic (Export)">
+  <!-- Concept B, simplified for 16-32 px (browser tab): bigger tanker and arrow, no domes or sea line. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4b8398"/>
+      <stop offset="1" stop-color="#22465a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="104" fill="url(#bg)"/>
+  <path d="M 262 206 L 400 96" fill="none" stroke="#f08b6c" stroke-width="56" stroke-linecap="round"/>
+  <polyline points="314,88 410,88 410,184" fill="none" stroke="#f08b6c" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="88" y="214" width="122" height="104" rx="14" fill="#ffffff"/>
+  <path d="M 52 306 L 466 306 L 404 412 L 100 412 Z" fill="#ffffff" stroke="#ffffff" stroke-width="20" stroke-linejoin="round"/>
+</svg>

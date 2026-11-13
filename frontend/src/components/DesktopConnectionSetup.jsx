@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AppLogo, { APP_NAME } from './AppLogo';
 
 export default function DesktopConnectionSetup() {
   const [apiUrl, setApiUrl] = useState('https://');
@@ -21,11 +22,11 @@ export default function DesktopConnectionSetup() {
   return (
     <main className="desktop-setup">
       <section className="desktop-setup-panel" aria-labelledby="desktop-setup-title">
-        <div className="desktop-setup-brand" aria-hidden="true">A</div>
-        <p className="desktop-setup-eyebrow">Astar ERP desktop client</p>
+        <div aria-hidden="true" style={{ marginBottom: 14 }}><AppLogo size={48} /></div>
+        <p className="desktop-setup-eyebrow">{APP_NAME} desktop client</p>
         <h1 id="desktop-setup-title">Connect to your ERP server</h1>
         <p className="desktop-setup-copy">
-          Enter the address of the server that hosts your Astar ERP API. This client uses the same account, permissions, and data as the web app.
+          Enter the address of the server that hosts the {APP_NAME} API. This client uses the same account, permissions, and data as the web app.
         </p>
 
         <form onSubmit={submit}>
@@ -45,7 +46,7 @@ export default function DesktopConnectionSetup() {
           {error && <p className="desktop-setup-error" role="alert">{error}</p>}
 
           <button className="desktop-setup-submit" type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Connect to Astar ERP'}
+            {saving ? 'Saving...' : 'Connect'}
           </button>
         </form>
       </section>

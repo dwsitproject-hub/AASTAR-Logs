@@ -72,7 +72,7 @@ Astar ERP is an internal operations portal for the AASTAR / KPN palm-product exp
 
 ### 3.4 Repository hygiene (High risk for operations)
 
-- **The tree is not under git.** About 90 `*.bak*`, `*.backup*` and `*.pre-*` source copies sit beside the live files, plus 15 `frontend/dist.*` folders and `rollback-archive-20260705/`.
+- **The tree was not under git** *(git added 2026-10-30 with a `.gitignore` that excludes the items below; a CI workflow runs both test suites, the PostgreSQL migrations and the build. The backup copies and data files are still on disk.)* About 90 `*.bak*`, `*.backup*` and `*.pre-*` source copies sit beside the live files, plus 15 `frontend/dist.*` folders and `rollback-archive-20260705/`.
 - **`backend/data/` holds copies of production databases.** These include `erp.db.backup-*` with user records, a 13.7 MB renamed WAL (`erp.db-wal_`) and orphaned `*.tmp-*` files.
 - **There is no CI, lint, type-check or `engines` field.** `check-live-erp.cjs` needs `puppeteer`, which is not a dependency.
 

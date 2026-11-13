@@ -1,0 +1,44 @@
+# PRODUCTION - frontend server 172.28.80.50 (nginx: the built pages, and /api + /api/ws
+# proxied to the backend server). Guide: docs/DEPLOYMENT-PRODUCTION.md. The image is
+# built on this server by release.sh; this file never builds.
+#
+# Published on the server's PRIVATE address, 172.28.80.50:3150: users open
+# http://172.28.80.50:3150 until aastar-logistic.kpndomain.com resolves; then the
+# host nginx vhost (nginx/host-vhost-aastar-logistic.conf) forwards the name to this
+# same address, so the domain switch changes no container.
+#
+# Run through deploy/production/dc.sh fe, which reads from /opt/astar-erp:
+#   .env    ASTAR_SUBNET (from preflight.sh fe), optional ASTAR_WEB_BIND
+# THIS HOST IS SHARED: fixed subnet (no default), private-address port, never 80/443.
+name: astar-erp-prod
+
+services:
+  frontend:
+    image: astar-erp-frontend:production
+    container_name: astar-erp-frontend
+    restart: unless-stopped
+    environment:
+      # The backend server's private address and port (be.compose.yml).
+      BACKEND_URL: ${ASTAR_BACKEND_URL:-http://172.28.80.51:4150}
+      # The host nginx (the vhost) arrives from this network's gateway or from the
+      # server's own address; only those may report the visitor's address.
+      TRUSTED_PROXY_CIDR: ${ASTAR_SUBNET:?set ASTAR_SUBNET in /opt/astar-erp/.env - run deploy/production/preflight.sh fe}
+      TRUSTED_HOST_IP: ${ASTAR_FE_HOST_IP:-172.28.80.50}
+    ports:
+      - "${ASTAR_WEB_BIND:-172.28.80.50:3150}:80"
+    networks: [astar]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+networks:
+  astar:
+    name: astar-erp_net
+    ipam:
+      config:
+        - subnet: ${ASTAR_SUBNET:?set ASTAR_SUBNET in /opt/astar-erp/.env - run deploy/production/preflight.sh fe}

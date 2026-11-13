@@ -6,11 +6,15 @@ const path = require('node:path');
 const { google } = require('googleapis');
 const { getDb } = require('../db/database');
 const { broadcastDataUpdated } = require('./realtime');
+const { sheetsCopiesOnly } = require('../config/dataSources');
 
+const PRODUCTION_SPREADSHEET_ID = '13jC69FfyHuhbcM5Vcu_Dgcj1a5kKWxXuLC98IRLTnEo';
 const SPREADSHEET_ID = String(
   process.env.APPS_SCRIPT_TEST_SPREADSHEET_ID
-  || '13jC69FfyHuhbcM5Vcu_Dgcj1a5kKWxXuLC98IRLTnEo'
+  || PRODUCTION_SPREADSHEET_ID
 ).trim();
+// A copies-only stack (SHEETS_COPIES_ONLY) leaves production's test sheet alone.
+const SHEET_SWITCHED_OFF = sheetsCopiesOnly() && SPREADSHEET_ID === PRODUCTION_SPREADSHEET_ID;
 const TAB_NAME = String(process.env.APPS_SCRIPT_TEST_TAB || 'Sheet1').trim();
 const SERVICE_ACCOUNT_EMAIL = String(
   process.env.APPS_SCRIPT_TEST_SERVICE_ACCOUNT_EMAIL
@@ -130,6 +134,7 @@ function notifyClients() {
 
 function loadSheetsClient() {
   if (sheetsClient) return sheetsClient;
+  if (SHEET_SWITCHED_OFF) throw new Error('Apps Script test sheet is switched off in this stack (SHEETS_COPIES_ONLY)');
   const keysDir = process.env.SERVICE_ACCOUNTS_DIR || path.join(__dirname, '../service-accounts');
   if (!fs.existsSync(keysDir)) throw new Error(`Service-account directory not found: ${keysDir}`);
 
@@ -1319,6 +1324,10 @@ async function ensureReady() {
 function start() {
   if (started) return;
   started = true;
+  if (SHEET_SWITCHED_OFF) {
+    console.log('Apps Script sheet sync switched off (SHEETS_COPIES_ONLY, no APPS_SCRIPT_TEST_SPREADSHEET_ID copy)');
+    return;
+  }
   stats.pushCount = Number(getMeta('push_count', '0')) || 0;
   stats.lastPushAt = getMeta('last_push_at');
   stats.lastReconciledAt = getMeta('last_reconciled_at');

@@ -3,7 +3,21 @@
 const crypto = require('node:crypto');
 const cookie = require('cookie');
 
-const SESSION_COOKIE_NAME = '__Host-erp_session';
+// SESSION_COOKIE_SECURE=false is for an internal staging served over plain HTTP:
+// browsers drop Secure cookies there, so the cookies lose the Secure flag and the
+// __Host- prefix (which requires it). Refused when the app itself is on HTTPS.
+function secureCookies(env = process.env) {
+  const insecure = ['0', 'false', 'off'].includes(String(env.SESSION_COOKIE_SECURE || '').trim().toLowerCase());
+  if (!insecure) return true;
+  if (/^https:/i.test(String(env.FRONTEND_URL || '').trim())) {
+    throw new Error('SESSION_COOKIE_SECURE=false is only allowed when FRONTEND_URL is plain http://');
+  }
+  return false;
+}
+
+const SECURE_COOKIES = secureCookies();
+if (!SECURE_COOKIES) console.warn('SESSION_COOKIE_SECURE=false: session cookies are sent over plain HTTP until the app has TLS (internal network only).');
+const SESSION_COOKIE_NAME = SECURE_COOKIES ? '__Host-erp_session' : 'erp_session';
 const SESSION_MAX_AGE_SECONDS = Math.max(300, Number(process.env.SESSION_COOKIE_MAX_AGE_SECONDS || 8 * 60 * 60));
 const REMEMBER_SESSION_MAX_AGE_SECONDS = Math.max(
   SESSION_MAX_AGE_SECONDS,
@@ -37,8 +51,9 @@ function sessionTokenFromRequest(request) {
 function sessionCookieOptions(maxAge = SESSION_MAX_AGE_SECONDS) {
   return {
     httpOnly: true,
-    secure: true,
-    sameSite: 'none',
+    secure: SECURE_COOKIES,
+    // SameSite=None requires Secure; plain-HTTP staging is single-origin anyway.
+    sameSite: SECURE_COOKIES ? 'none' : 'lax',
     path: '/',
     maxAge,
     priority: 'high',
@@ -77,6 +92,7 @@ function sessionFingerprint(token, key = process.env.SESSION_AUDIT_HMAC_KEY || p
 
 module.exports = {
   REMEMBER_SESSION_MAX_AGE_SECONDS,
+  SECURE_COOKIES,
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
   clearSessionCookie,
@@ -84,6 +100,7 @@ module.exports = {
   requestCookies,
   sessionCookieOptions,
   sessionFingerprint,
+  secureCookies,
   sessionTokenFromRequest,
   setSessionCookie,
 };

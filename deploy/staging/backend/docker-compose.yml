@@ -1,0 +1,47 @@
+# STAGING - backend server 172.28.92.57 (Node API, DWS Hub sign-in, Google Sheets sync).
+#
+# Run from this folder:   ./deploy.sh            (pull, build, migrate, start, check)
+# Settings and secrets:   .env.staging next to this file (copy .env.staging.example)
+# Google key file(s):     ./service-accounts/*.json (readable by uid 1000 only)
+#
+# The port is published on the private address only: the frontend server
+# (172.28.92.56) reaches it, the public interface does not.
+name: astar-erp-staging-be
+
+services:
+  backend:
+    build:
+      context: ../../../backend
+    image: astar-erp-backend:staging
+    container_name: astar-erp-backend-staging
+    env_file: .env.staging
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      # One trusted hop: the nginx container on the frontend server.
+      TRUST_PROXY_HOPS: 1
+      # Staging syncs copies of the spreadsheets only, never the production ones.
+      SHEETS_COPIES_ONLY: 1
+    ports:
+      - "${BACKEND_BIND_IP:-172.28.92.57}:${BACKEND_HOST_PORT:-4150}:3001"
+    volumes:
+      # SQLite user/security data and the 17 Google Sheets mirrors.
+      - astar-erp-staging-data:/app/data
+      - ./service-accounts:/app/service-accounts:ro
+    # The staging Hub announces itself as test-dwshub.kpndomain.com (served on the
+    # frontend server, port 80). Pin the name so the token endpoint and signing keys
+    # are reachable even where the server's DNS does not know the company domain.
+    extra_hosts:
+      - "test-dwshub.kpndomain.com:${HUB_HOST_IP:-172.28.92.56}"
+    restart: unless-stopped
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  astar-erp-staging-data:
+    name: astar-erp-staging-data

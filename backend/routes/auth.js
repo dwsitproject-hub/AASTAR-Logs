@@ -23,10 +23,13 @@ const {
   clearTransaction,
   getHubSsoClient,
   isAllowedHubEmail,
+  launchRestartAllowed,
+  markLaunchRestart,
   provisionHubUser,
   readTransaction,
   startTransaction,
 } = require('../services/hubSso');
+const { findLocalDevUser, localDevLoginEmail } = require('../services/localDevLogin');
 const {
   currentShiftWindow,
   credentialAuditMetadata,
@@ -43,10 +46,14 @@ const {
 
 const router = express.Router();
 const DECOY_PATH = '/atlas/royal-continent';
+const RECOVERY_EMAIL = String(process.env.MATTHEW_EMAIL || 'matthew.chiu@kpn-corp.com').trim().toLowerCase();
 const GOOGLE_ALLOWED_DOMAIN = String(process.env.GOOGLE_ALLOWED_DOMAIN || 'kpn-corp.com').trim().toLowerCase();
 const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || '').trim();
 const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 const HUB_SESSION_REMEMBER = ['1', 'true', 'on'].includes(String(process.env.DWS_HUB_SESSION_REMEMBER || '').trim().toLowerCase());
+// Throws (and stops the server) if it is set together with NODE_ENV=production.
+const LOCAL_DEV_LOGIN_EMAIL = localDevLoginEmail();
+if (LOCAL_DEV_LOGIN_EMAIL) console.warn(`Local dev sign-in is ENABLED for ${LOCAL_DEV_LOGIN_EMAIL}. Never use this outside a local stack.`);
 let manualActivityReportInFlight = false;
 
 function safeString(value, maxLength) {
@@ -65,6 +72,8 @@ function publicUser(user) {
     email: user.email || null,
     hub_sub: user.hub_sub || null,
     is_admin: user.is_admin === 1,
+    // The recovery administrator (MATTHEW_EMAIL): IP Security and the activity report.
+    is_recovery: String(user.email || '').trim().toLowerCase() === RECOVERY_EMAIL,
     is_approved: user.is_approved === 1,
     permissions: parseJsonList(user.permissions),
     tab_permissions: parseJsonList(user.tab_permissions),
@@ -155,7 +164,21 @@ router.get('/access-status', (req, res) => {
     hubSso: {
       enabled: getHubSsoClient().config.enabled,
     },
+    devLogin: LOCAL_DEV_LOGIN_EMAIL ? { enabled: true, email: LOCAL_DEV_LOGIN_EMAIL } : { enabled: false },
   });
+});
+
+// Local stacks only (see services/localDevLogin.js): signs in the one seeded account.
+router.post('/dev-login', (req, res) => {
+  if (!LOCAL_DEV_LOGIN_EMAIL) return res.status(404).json({ error: 'Not found' });
+  const user = findLocalDevUser(getDb(), LOCAL_DEV_LOGIN_EMAIL);
+  if (!user || user.is_approved !== 1) {
+    return res.status(403).json({
+      code: 'ACCOUNT_PENDING',
+      error: `No approved account for ${LOCAL_DEV_LOGIN_EMAIL}. Run: npm run seed:admin -- ${LOCAL_DEV_LOGIN_EMAIL}`,
+    });
+  }
+  issueSession(user, req, res, 'local-dev', false);
 });
 
 // Used by Nginx auth_request before it serves an ERP document route. The
@@ -371,9 +394,17 @@ router.get('/sso/callback', async (req, res) => {
     recordHubEvent(req, { result: 'failure', reason: `hub-error:${hubErrorCode}`, credentialSupplied: false });
     return redirectToLoginWithError(res, 'hub_denied');
   }
+  if (!transaction && code && launchRestartAllowed(req)) {
+    // Opened from the Hub tile: the Hub ran its own authorize, so the code's PKCE
+    // verifier is not ours and the code is never redeemed. Start a normal sign-in
+    // instead; with the user's Hub session it completes without a prompt.
+    markLaunchRestart(res);
+    recordHubEvent(req, { result: 'restarted', reason: 'hub-launch-restarted', credentialSupplied: false });
+    return res.redirect(302, '/api/auth/sso/login');
+  }
   if (!transaction || !code) {
-    // Expired, replayed or foreign callback (including a Hub-initiated launch that
-    // this app did not start): the PKCE verifier is unknown, so the code is unusable.
+    // Expired, replayed or foreign callback, or a second Hub launch right after a
+    // restart: the PKCE verifier is unknown, so the code is unusable.
     recordHubEvent(req, { result: 'failure', reason: transaction ? 'missing-code' : 'state-mismatch' });
     return redirectToLoginWithError(res, 'session_expired');
   }
