@@ -66,7 +66,7 @@ host lost the NAS. Here:
 
 | Item | From | Used in |
 |---|---|---|
-| RDS: `172.28.80.51` on the whitelist; account `astar_erp_owner`, database `astar_erp`, two roles (privileged account) | DBA / cloud admin | §3 |
+| RDS: `172.28.80.51` on the whitelist; account `astar_erp_owner` Aastarkpnlogs!2026, database `astar_erp`, two roles (privileged account) | DBA / cloud admin | §3 |
 | The app registered in the **production** DWS Hub: client id, both redirect URIs, SDK key; Sentinel's GitHub token covering `AASTAR-Logs` | Hub administrator, GitHub org owner | §4 |
 | Read-only GitHub deploy key per server | Repository admin | §5 |
 | A Google service account with **Editor** access to the six production spreadsheets, and its JSON key | Google Cloud project owner, spreadsheet owners | §6 |
@@ -119,6 +119,13 @@ PostgreSQL 14, 16 and 18.
    The last line must list three roles, `astar_erp_owner` with `t`. The role names are prefixed because the instance
    is shared. *Console alternative:* create the account and the database in the console, then run the two
    `CREATE ROLE … NOLOGIN` lines and `GRANT ALL ON DATABASE astar_erp TO astar_erp_owner;` as the privileged account.
+   Either way, check that `astar_erp_owner` may create schemas in the database (the migrations fail with *permission
+   denied for database astar_erp* otherwise, §15):
+   ```sql
+   SELECT pg_get_userbyid(datdba) AS owner, has_database_privilege('astar_erp_owner','astar_erp','CREATE') AS can_create
+   FROM pg_database WHERE datname = 'astar_erp';
+   ```
+   Expected: `can_create` = `t` (`owner` is `astar_erp_owner`, or the console's account with the console alternative).
 3. **Backup**: RDS → Backup and Restoration → automatic backups on (≥ 7 days) — it matters from Phase 1.
 4. SSL was off on the instances checked so far (`sslmode=disable` on the private network). If it is on, see §11.
 
@@ -481,6 +488,7 @@ Everything in [DEPLOYMENT-STAGING.md](DEPLOYMENT-STAGING.md) §13 applies, with 
 | `STOP - the code in /opt/astar-erp/src has local changes` | Someone edited files on the server: `git -C /opt/astar-erp/src status`, undo or move the change to GitHub. |
 | `STOP - release tag … does not exist` | Tag the commit and push the tag (§12). |
 | `MIGRATION_BAD_URL` / `password authentication failed` / timeout | §3 and `secrets.production.env`; RDS whitelist. `--skip-migrate` deploys the app meanwhile. |
+| `permission denied for database astar_erp` after `Applying RDS schema migrations...` | `astar_erp_owner` may not create schemas: the database belongs to another account (created in the console, or without `OWNER`). As the privileged account in DMS: `SELECT pg_get_userbyid(datdba), has_database_privilege('astar_erp_owner','astar_erp','CREATE') FROM pg_database WHERE datname='astar_erp';` — then `GRANT astar_erp_owner TO CURRENT_USER; ALTER DATABASE astar_erp OWNER TO astar_erp_owner;` (or `GRANT ALL ON DATABASE astar_erp TO astar_erp_owner;`) until the second column is `t`. Run `release.sh` again. |
 | Sheets Config: **Sync error** `caller does not have permission` | The spreadsheet is not shared as **Editor** with the account shown for it (§6). |
 | Sheets Config: **No key on server** | That account's key file is missing from `/opt/astar-erp/service-accounts/`, or `SHEETS_SERVICE_ACCOUNT_EMAIL` does not match the key's `client_email` (§6, §7). |
 | Users get *"awaiting ERP access approval"* | Nobody added them yet, or they were added with a different email than their Hub email: give the pending account a role (§9 step 4). |
