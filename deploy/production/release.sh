@@ -4,9 +4,9 @@
 #
 #   /opt/astar-erp/src/deploy/production/release.sh be v1.0.0                  # BE 172.28.80.51 first
 #   /opt/astar-erp/src/deploy/production/release.sh fe v1.0.0                  # then FE 172.28.80.50
-#   ... be v1.0.0 --create-only   first deploy: build, migrate, create the container and its data
-#                                 volume WITHOUT starting it, so the current server's data can be
-#                                 imported first (guide §7); then `dc.sh be up -d`
+#   ... be v1.0.0 --create-only   build, migrate, create the container and its data volume WITHOUT
+#                                 starting it (e.g. to restore a backup into the volume first, §13);
+#                                 then `dc.sh be up -d`
 #   ... be v1.0.0 --skip-migrate  leave the RDS schema alone (the app does not read RDS before Phase 1)
 #
 # Guarded: refuses when the checkout has local edits or the tag does not exist, keeps the
@@ -76,7 +76,7 @@ else
 fi
 if [ "$CREATE_ONLY" = 1 ]; then
   $DC create --force-recreate
-  echo "Created $CONTAINER and its volume without starting them. Import the data (guide §7), then: $DC up -d"
+  echo "Created $CONTAINER and its volume without starting them. Start them with: $DC up -d"
   exit 0
 fi
 $DC up -d --force-recreate
