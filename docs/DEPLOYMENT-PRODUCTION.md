@@ -178,13 +178,16 @@ Expected: *"Hi dwsitproject-hub/AASTAR-Logs! You've successfully authenticated"*
 question the first time).
 
 ```bash
-mkdir -p /opt/astar-erp && cd /opt/astar-erp
-git clone git@github-astarerp:dwsitproject-hub/AASTAR-Logs.git src
-git -C src checkout v1.0.0
+mkdir -p /opt/astar-erp
+git clone git@github-astarerp:dwsitproject-hub/AASTAR-Logs.git /opt/astar-erp/src
+git -C /opt/astar-erp/src fetch --tags origin
+git -C /opt/astar-erp/src checkout v1.0.0
 ```
 
-Production runs a tagged release, not whatever `main` is at (§12). If a clone fails half-way, remove the leftover
-`/opt/astar-erp/src` before retrying.
+Expected after the last line: `HEAD is now at …` (a "detached HEAD" note is normal for a tag). `pathspec 'v1.0.0' did not
+match` means the tag is not on GitHub yet (§12 step 2). Production runs a tagged release, not whatever `main` is at.
+If a clone fails half-way, remove the leftover `/opt/astar-erp/src` before retrying; if it already exists, skip the
+`git clone` line.
 
 **Preflight — read-only, on each server.** It changes nothing; paste the whole output back for review:
 
