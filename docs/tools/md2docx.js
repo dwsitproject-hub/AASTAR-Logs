@@ -265,11 +265,15 @@ while (i < lines.length) {
     const numbered = /\d+\./.test(listMatch[2]);
     numberedInstance += numbered ? 1 : 0;
     const instance = numberedInstance;
+    // Indented, non-empty lines that are not a new item, a code fence or a table
+    // continue the item above (Markdown soft-wraps long items).
+    const isContinuation = text => text.trim() && /^\s{2,}/.test(text) && !/^\s*([-*]|\d+\.)\s/.test(text)
+      && !text.trim().startsWith('|') && !text.trim().startsWith('```');
     while (i < lines.length) {
       const m = lines[i].match(/^(\s*)([-*]|\d+\.)\s+(.*)$/);
       if (!m) {
-        // continuation line of the previous item
-        if (lines[i].trim() && /^\s{2,}/.test(lines[i]) && !lines[i].trim().startsWith('|')) {
+        // A stray continuation (e.g. after a fenced block inside the list).
+        if (isContinuation(lines[i])) {
           para(inline(lines[i].trim()), { indent: { left: 720 }, spacing: { after: 60 } });
           i++;
           continue;
@@ -278,11 +282,16 @@ while (i < lines.length) {
       }
       const level = Math.min(2, Math.floor(m[1].length / 2));
       const isNum = /\d+\./.test(m[2]);
-      para(inline(m[3]), {
+      const text = [m[3]];
+      i++;
+      while (i < lines.length && isContinuation(lines[i])) {
+        text.push(lines[i].trim());
+        i++;
+      }
+      para(inline(text.join(' ')), {
         numbering: isNum ? { reference: 'numbered', level, instance } : { reference: 'bullets', level },
         spacing: { after: 60, line: 264 },
       });
-      i++;
     }
     continue;
   }

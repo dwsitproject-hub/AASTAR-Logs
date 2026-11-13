@@ -34,6 +34,7 @@ test('existing access becomes roles once: admins get Administrator, equal access
       ('Ann', 'ann@kpn-corp.com', 0, '[]', '["/logistics/vessel-status","/logistics/stock-summary"]'),
       ('Bob', 'bob@kpn-corp.com', 0, '[]', '["/logistics/stock-summary","/logistics/vessel-status"]'),
       ('Cat', 'cat@kpn-corp.com', 0, '["finance","commercial"]', '[]'),
+      ('Dan', 'dan@kpn-corp.com', 0, '["commercial","finance"]', '["/operations/contract-dashboard","/operations/vessel-contract","/logistics/stock-summary","/chartering/export-planning"]'),
       ('New', 'new@kpn-corp.com', 0, '[]', '[]');
     UPDATE users SET is_approved = 0 WHERE username = 'New';
   `);
@@ -48,8 +49,10 @@ test('existing access becomes roles once: admins get Administrator, equal access
   assert.equal(user('Cat').role_name, 'Commercial + Finance & Accounting', 'a department with tabs means all its tabs');
   assert.deepEqual(JSON.parse(user('Cat').tab_permissions), ['/commercial/open-shipments', '/commercial/kpn-export']);
   assert.deepEqual(JSON.parse(user('Cat').permissions), ['finance']);
+  // Five departments do not fit 60 characters even without page counts.
+  assert.equal(user('Dan').role_name, 'Custom access', 'too long a description becomes a generic name, never cut mid-word');
   assert.equal(user('New').role_id, null, 'users without access stay without a role');
-  assert.equal(listRoles(db).length, 3, 'the migration runs once');
+  assert.equal(listRoles(db).length, 4, 'the migration runs once');
   db.close();
 });
 

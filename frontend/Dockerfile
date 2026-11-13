@@ -16,12 +16,12 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 # local: the Docker Compose stack (backend service name, Docker DNS).
-# staging: deploy/staging/frontend, backend address from BACKEND_URL at start-up.
+# staging / production: deploy/<env>/, backend address from BACKEND_URL at start-up.
 ARG NGINX_CONFIG=local
 COPY nginx/ /tmp/nginx/
-RUN if [ "$NGINX_CONFIG" = "staging" ]; then \
+RUN if [ "$NGINX_CONFIG" = "staging" ] || [ "$NGINX_CONFIG" = "production" ]; then \
       mkdir -p /etc/nginx/templates \
-      && cp /tmp/nginx/staging.conf.template /etc/nginx/templates/default.conf.template \
+      && cp "/tmp/nginx/$NGINX_CONFIG.conf.template" /etc/nginx/templates/default.conf.template \
       && rm -f /etc/nginx/conf.d/default.conf; \
     else \
       cp /tmp/nginx/default.conf /etc/nginx/conf.d/default.conf; \

@@ -43,18 +43,26 @@ function normalizeAccess(permissions, tabPermissions) {
   };
 }
 
+// A readable name for generated roles that fits NAME_MAX: with page counts, then
+// department names only, then a generic name (never cut mid-word).
 function describeAccess(access) {
-  const parts = [];
+  const detailed = [];
+  const plain = [];
   for (const department of DEPARTMENTS) {
     if (department.tabs.length) {
       const granted = department.tabs.filter(path => access.tab_permissions.includes(path)).length;
-      if (granted === department.tabs.length) parts.push(department.label);
-      else if (granted) parts.push(`${department.label} (${granted} page${granted === 1 ? '' : 's'})`);
+      if (!granted) continue;
+      plain.push(department.label);
+      detailed.push(granted === department.tabs.length ? department.label : `${department.label} (${granted} page${granted === 1 ? '' : 's'})`);
     } else if (access.permissions.includes(department.dept)) {
-      parts.push(department.label);
+      plain.push(department.label);
+      detailed.push(department.label);
     }
   }
-  return parts.join(' + ');
+  for (const name of [detailed.join(' + '), plain.join(' + ')]) {
+    if (name.length <= NAME_MAX - 4) return name;
+  }
+  return 'Custom access';
 }
 
 function uniqueName(db, base) {

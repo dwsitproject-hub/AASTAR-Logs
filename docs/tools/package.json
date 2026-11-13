@@ -4,7 +4,7 @@
   "description": "Rebuilds the documentation diagrams (docs/images) and Word files (docs/*.docx) from the Markdown sources.",
   "scripts": {
     "diagrams": "node diagrams.js ../images",
-    "docx": "node md2docx.js ../PRD.md ../Astar-ERP-PRD.docx \"Astar ERP — Product Requirements Document v1.0\" && node md2docx.js ../TECHNICAL-DESIGN.md ../Astar-ERP-Technical-Design.docx \"Astar ERP — Technical Design Document v1.0\" && node md2docx.js ../DEPLOYMENT-STAGING.md ../Astar-ERP-Staging-Deployment.docx \"Astar ERP — Staging Deployment Guide\"",
+    "docx": "node md2docx.js ../PRD.md ../Astar-ERP-PRD.docx \"Astar ERP — Product Requirements Document v1.0\" && node md2docx.js ../TECHNICAL-DESIGN.md ../Astar-ERP-Technical-Design.docx \"Astar ERP — Technical Design Document v1.0\" && node md2docx.js ../DEPLOYMENT-STAGING.md ../Astar-ERP-Staging-Deployment.docx \"Astar ERP — Staging Deployment Guide\" && node md2docx.js ../DEPLOYMENT-PRODUCTION.md ../Astar-ERP-Production-Deployment.docx \"AASTAR Logistic (Export) — Production Deployment Guide\"",
     "build": "npm run diagrams && npm run docx"
   },
   "dependencies": {

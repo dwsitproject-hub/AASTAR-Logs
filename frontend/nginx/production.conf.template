@@ -1,0 +1,62 @@
+# Production frontend server (deploy/production/fe.compose.yml): serves the built
+# pages and proxies /api and /api/ws to the backend server's private address.
+# Filled in at start-up by the nginx image: ${BACKEND_URL}, ${TRUSTED_PROXY_CIDR},
+# ${TRUSTED_HOST_IP}.
+#
+# Users reach this container two ways: directly on the server's private address
+# (http://172.28.80.50:3150) and, once DNS exists, through the host nginx vhost
+# (aastar-logistic.kpndomain.com). The host nginx's connections arrive either from
+# the app network's gateway (Docker's userland proxy) or from the server's own
+# address (iptables), depending on the host's Docker settings - so exactly those two
+# may report the visitor's address, and nobody else's X-Forwarded-For is believed.
+# Without this, every domain user would share one address and one person's failed
+# sign-ins could lock everyone out.
+set_real_ip_from ${TRUSTED_PROXY_CIDR};
+set_real_ip_from ${TRUSTED_HOST_IP};
+real_ip_header X-Forwarded-For;
+
+server {
+  listen 80;
+  server_name _;
+  server_tokens off;
+
+  root /usr/share/nginx/html;
+  index index.html;
+
+  add_header X-Content-Type-Options nosniff always;
+  add_header Referrer-Policy strict-origin-when-cross-origin always;
+  add_header X-Frame-Options SAMEORIGIN always;
+
+  gzip on;
+  gzip_types application/json application/javascript text/css image/svg+xml;
+
+  location = /healthz { access_log off; default_type text/plain; return 200 "ok\n"; }
+
+  location = /site.webmanifest { default_type application/manifest+json; add_header Cache-Control "no-cache"; }
+
+  location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; try_files $uri =404; }
+
+  location = /api/ws {
+    proxy_pass ${BACKEND_URL};
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;   # the real visitor (see above); TRUST_PROXY_HOPS=1
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 1h;
+  }
+
+  location /api/ {
+    proxy_pass ${BACKEND_URL};
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 90s;                          # Google Sheets writes can take up to 60 s
+    client_max_body_size 200k;
+  }
+
+  location / { try_files $uri /index.html; add_header Cache-Control "no-cache"; }
+}

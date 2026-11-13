@@ -354,7 +354,7 @@ docker exec astar-erp-backend-staging node -e "fetch('http://test-dwshub.kpndoma
 docker logs astar-erp-backend-staging 2>&1 | grep -iE "sync|SESSION_COOKIE" | tail -5
 ```
 
-Expect `SESSION_COOKIE_SECURE=false: … Internal staging only.` and no `Bulk fetch failed` lines after the first minute.
+Expect `SESSION_COOKIE_SECURE=false: session cookies are sent over plain HTTP …` and no `Bulk fetch failed` lines after the first minute.
 
 ### 6.5 First administrator
 

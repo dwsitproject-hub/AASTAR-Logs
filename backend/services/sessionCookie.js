@@ -16,7 +16,7 @@ function secureCookies(env = process.env) {
 }
 
 const SECURE_COOKIES = secureCookies();
-if (!SECURE_COOKIES) console.warn('SESSION_COOKIE_SECURE=false: session cookies are sent over plain HTTP. Internal staging only.');
+if (!SECURE_COOKIES) console.warn('SESSION_COOKIE_SECURE=false: session cookies are sent over plain HTTP until the app has TLS (internal network only).');
 const SESSION_COOKIE_NAME = SECURE_COOKIES ? '__Host-erp_session' : 'erp_session';
 const SESSION_MAX_AGE_SECONDS = Math.max(300, Number(process.env.SESSION_COOKIE_MAX_AGE_SECONDS || 8 * 60 * 60));
 const REMEMBER_SESSION_MAX_AGE_SECONDS = Math.max(

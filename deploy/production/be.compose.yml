@@ -1,0 +1,65 @@
+# PRODUCTION - backend server 172.28.80.51 (Node API: sign-in, roles, Google Sheets sync).
+# Guide: docs/DEPLOYMENT-PRODUCTION.md. The image is built on this server by release.sh;
+# this file never builds.
+#
+# Run through deploy/production/dc.sh (or release.sh), which points Compose at the
+# runtime folder /opt/astar-erp, so the files below are read from there:
+#   .env                     ASTAR_SUBNET (from preflight.sh be)
+#   production.env           settings (from deploy/production/production.env)
+#   secrets.production.env   secrets (from secrets.production.env.example, chmod 600)
+#   service-accounts/        the production Google key files (uid 1000, chmod 600)
+#
+# THIS HOST IS SHARED. Two rules keep this app from breaking the others:
+#   1. The app network has a FIXED subnet (ASTAR_SUBNET, no default). Left to itself
+#      Docker picks a free 172.x /16, and on staging that once took 172.30.0.0/16 -
+#      the Synology NAS's range - and cut every app on the host off from the NAS.
+#   2. The port is published on the private address only, never 0.0.0.0 / 80 / 443.
+# This app does not use the NAS: no mount, nothing under /mnt is touched.
+name: astar-erp-prod
+
+services:
+  backend:
+    image: astar-erp-backend:production
+    container_name: astar-erp-backend
+    restart: unless-stopped
+    stop_grace_period: 15s
+    env_file:
+      - ./production.env
+      - path: ./secrets.production.env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      # One trusted hop: the nginx container on the FE server, which passes on the
+      # visitor's real address (frontend/nginx/production.conf.template).
+      TRUST_PROXY_HOPS: 1
+    ports:
+      # Private address only: the FE server's nginx is the only caller.
+      - "${ASTAR_API_BIND:-172.28.80.51:4150}:3001"
+    volumes:
+      # SQLite: users, roles, Sheets Config, sign-in security, activity log, and the
+      # 17 Google Sheets mirrors. Backed up nightly by backup.sh.
+      - astar-erp-data:/app/data
+      - ./service-accounts:/app/service-accounts:ro
+    # The production Hub (dwshub.kpndomain.com) is served by the FE server's host
+    # nginx on 443. Pin the name so the token endpoint and signing keys are reachable
+    # even if this server's DNS does not know the company domain.
+    extra_hosts:
+      - "dwshub.kpndomain.com:${HUB_HOST_IP:-172.28.80.50}"
+    networks: [astar]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+networks:
+  astar:
+    name: astar-erp_net
+    ipam:
+      config:
+        # Required, no default on purpose: see rule 1 above.
+        - subnet: ${ASTAR_SUBNET:?set ASTAR_SUBNET in /opt/astar-erp/.env - run deploy/production/preflight.sh be}
+
+volumes:
+  astar-erp-data:
+    name: astar-erp-production-data
