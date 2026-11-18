@@ -179,6 +179,9 @@ test('DWS Hub OIDC sign-in: PKCE, JWKS verification, approval gate and identity 
     const body = await me.json();
     assert.equal(body.user.hub_sub, newcomer.sub);
     assert.equal(body.user.email, newcomer.email);
+    // The pages survive a page reload (/me), not only the sign-in response.
+    assert.deepEqual(body.user.tab_permissions, ['/logistics/vessel-status']);
+    assert.deepEqual(body.user.permissions, []);
     assert.ok(body.csrfToken);
   });
 

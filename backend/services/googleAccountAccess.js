@@ -1,6 +1,11 @@
 'use strict';
 
+// Accepts the stored JSON text or an already-parsed list. /auth/me passes the
+// session user (whose lists verifySessionToken has already parsed) through
+// publicUser; JSON.parse on a list throws, which used to drop every page of a
+// non-administrator on each page load.
 function parseJsonList(value) {
+  if (Array.isArray(value)) return value.filter(item => typeof item === 'string');
   try {
     const parsed = JSON.parse(value || '[]');
     return Array.isArray(parsed) ? parsed : [];
