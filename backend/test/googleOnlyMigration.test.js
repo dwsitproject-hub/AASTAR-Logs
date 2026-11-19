@@ -60,7 +60,7 @@ test('Google-only migration preserves existing approval and invalidates legacy s
   assert.equal(result.otherAdmin.password, null);
   assert.equal(result.otherAdmin.is_admin, 0);
   assert.equal(JSON.parse(result.otherAdmin.permissions).includes('admin'), false);
-  assert.deepEqual(JSON.parse(result.otherAdmin.tab_permissions), ['/commercial/open-shipments', '/commercial/kpn-export']);
+  assert.deepEqual(JSON.parse(result.otherAdmin.tab_permissions), ['/commercial/vessel-info', '/commercial/kpn-export']);
   assert.equal(result.futureUser.password, null);
   assert.equal(result.futureUser.is_admin, 0);
   assert.equal(result.futureUser.is_approved, 0);

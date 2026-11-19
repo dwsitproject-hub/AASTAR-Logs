@@ -22,6 +22,7 @@ const DEPT_CARDS = [
   { label: 'Operations', path: '/operations', dept: 'operations', icon: Icons.operations, color: '#2ecc71', children: [
     { label: 'Contract Dashboard', path: '/operations/contract-dashboard' },
     { label: 'TPG/GR Weekly Ops Meeting', path: '/operations/tpg-gr-weekly-ops' },
+    { label: 'Demurrage Records', path: '/operations/demurrage-records' },
   ] },
   { label: 'Logistics', path: '/logistics', dept: 'logistics', icon: Icons.logistics, color: '#9b59b6', children: [
     { label: 'Export Summary', path: '/logistics/export-summary' },

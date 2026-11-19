@@ -113,7 +113,10 @@ const SHEET_WRITES = {
   'DB3:KIMARA SALES': [VESSEL_MATCHING_WRITES, MATCH_ID_REPAIR_WRITES],
   'DB4:KIMARA PURCHASE': [VESSEL_MATCHING_WRITES, MATCH_ID_REPAIR_WRITES],
   'DB5:MAIN SHIPMENT FILE': [VESSEL_MATCHING_WRITES, MATCH_ID_REPAIR_WRITES],
-  'DB6:VESSEL DB': ['Vessel Update: edit, add and delete vessel rows'],
+  'DB6:VESSEL DB': [
+    'Vessel Update: edit, add and delete vessel rows',
+    'Demurrage Records: update record, settlement, visibility and nil-demurrage fields',
+  ],
   'DB10:Vessel Links': ['Vessel Matching / Contract Unlink: add and update contract-to-vessel link rows'],
 };
 
@@ -228,7 +231,7 @@ const DATA_DATABASES = [
     sheetId: VESSEL_SHEET,
     serviceAccountEmail: SA_VESSEL,
     identifierColumns: ['vslid_1', 'vslid_2', 'vslid_3', 'vslid_4', 'vslid_5', 'vslid_6', 'vslid_7', 'vslid_8', 'vslid_9', 'vslid_10'],
-    sources: [{ table: 'VESSEL_DB', tab: 'VESSEL DB', range: 'A:FX' }],
+    sources: [{ table: 'VESSEL_DB', tab: 'VESSEL DB', range: 'A:GA' }],
   },
   {
     name: 'DB7',

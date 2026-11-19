@@ -12,7 +12,7 @@ export const DEPARTMENTS = [
   {
     dept: 'commercial', label: 'Commercial', path: '/commercial', color: '#3498db',
     tabs: [
-      { label: 'Open Shipments', path: '/commercial/open-shipments' },
+      { label: 'Vessel info', path: '/commercial/vessel-info' },
       { label: 'KPN Export', path: '/commercial/kpn-export' },
     ],
   },
@@ -22,6 +22,7 @@ export const DEPARTMENTS = [
       { label: 'Contract Dashboard', path: '/operations/contract-dashboard' },
       { label: 'Vessel Contract', path: '/operations/vessel-contract' },
       { label: 'TPG/GR Weekly Ops Meeting', path: '/operations/tpg-gr-weekly-ops' },
+      { label: 'Demurrage Records', path: '/operations/demurrage-records' },
     ],
   },
   {
@@ -29,7 +30,7 @@ export const DEPARTMENTS = [
     tabs: [
       { label: 'Stock Summary', path: '/logistics/stock-summary' },
       { label: 'Vessel Status', path: '/logistics/vessel-status' },
-      { label: 'Live Vessels', path: '/logistics/live-vessels' },
+      { label: 'Vessel info', path: '/logistics/live-vessels' },
       { label: 'Export Summary', path: '/logistics/export-summary' },
       { label: 'Export Summary Total', path: '/logistics/export-summary-total' },
       { label: 'Vessel Update', path: '/logistics/vessel-update' },

@@ -43,7 +43,11 @@ const VESSEL_COL = {
   laytime_rate: 15,
   laytime_starts: 16,
   remarks: 17,
-  nominated: 18
+  nominated: 18,
+  demurrage_records: 179,
+  demurrage_status: 180,
+  show: 181,
+  nil_demurrage: 182
 };
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -137,6 +141,7 @@ function loadVesselDatabase(databasePath = VESSEL_DB_PATH) {
     const { dates, times } = vesselDateColumns();
     const records = db.prepare('SELECT * FROM vessel_db ORDER BY CAST(_sheet_row AS INTEGER)').all();
     const rows = [[]];
+    const sheetRows = [];
     for (const record of records) {
       const row = [];
       sourceColumns.forEach((column, index) => {
@@ -146,9 +151,15 @@ function loadVesselDatabase(databasePath = VESSEL_DB_PATH) {
         else row[index] = value == null ? '' : value;
       });
       rows.push(row);
+      sheetRows.push(Number(record._sheet_row));
     }
     const metadata = db.prepare('SELECT pulled_at FROM _database_meta LIMIT 1').get();
-    const value = { rows, updatedAt: metadata?.pulled_at || null };
+    const value = {
+      rows,
+      sheetRows,
+      columns: sourceColumns.map(column => column.name),
+      updatedAt: metadata?.pulled_at || null,
+    };
     vesselDatabaseCache.set(databasePath, { signature: databaseFileSignature(databasePath), value });
     return value;
   } finally {
@@ -208,7 +219,15 @@ function normalizeDemmRate(s) {
   return n.toString();
 }
 
-function buildVesselList(data, { statusFilter = 'open', query = '' } = {}) {
+function buildVesselList(data, {
+  statusFilter = 'open',
+  query = '',
+  sheetRows = [],
+  demurrageRecordsColumn = VESSEL_COL.demurrage_records,
+  demurrageStatusColumn = VESSEL_COL.demurrage_status,
+  showColumn = VESSEL_COL.show,
+  nilDemurrageColumn = VESSEL_COL.nil_demurrage,
+} = {}) {
   if (!data || data.length < 2) return { vessels: [], options: { charterers: [], entities: [], cargos: [], shippers: [], ports: [], ops: [] } };
 
   const vessels = [];
@@ -276,7 +295,7 @@ function buildVesselList(data, { statusFilter = 'open', query = '' } = {}) {
 
     const rawDemm = str(row[VESSEL_COL.demm_rate]).trim();
     const v = {
-      row: r + 1,
+      row: Number(sheetRows[r - 1]) || r + 1,
       vsl_id,
       charterer,
       entity,
@@ -293,6 +312,18 @@ function buildVesselList(data, { statusFilter = 'open', query = '' } = {}) {
       est_demmurage: str(row[VESSEL_COL.est_demmurage]).trim(),
       remarks: str(row[VESSEL_COL.remarks]).trim(),
       nominated: parseCheckbox(row[VESSEL_COL.nominated]),
+      demurrage_records: Number.isInteger(demurrageRecordsColumn) && demurrageRecordsColumn >= 0
+        ? str(row[demurrageRecordsColumn])
+        : '',
+      demurrage_status: Number.isInteger(demurrageStatusColumn) && demurrageStatusColumn >= 0
+        ? parseCheckbox(row[demurrageStatusColumn])
+        : false,
+      show: Number.isInteger(showColumn) && showColumn >= 0
+        ? parseCheckbox(row[showColumn])
+        : false,
+      nil_demurrage: Number.isInteger(nilDemurrageColumn) && nilDemurrageColumn >= 0
+        ? parseCheckbox(row[nilDemurrageColumn])
+        : false,
       ports
     };
 

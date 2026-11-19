@@ -7,11 +7,16 @@
 // paths); departments without sub-tabs are granted whole (`permissions` holds
 // the department name). The Admin Panel comes only with the Administrator role.
 const DEPARTMENTS = [
-  { dept: 'commercial', label: 'Commercial', tabs: ['/commercial/open-shipments', '/commercial/kpn-export'] },
+  { dept: 'commercial', label: 'Commercial', tabs: ['/commercial/vessel-info', '/commercial/kpn-export'] },
   {
     dept: 'operations',
     label: 'Operations',
-    tabs: ['/operations/contract-dashboard', '/operations/vessel-contract', '/operations/tpg-gr-weekly-ops'],
+    tabs: [
+      '/operations/contract-dashboard',
+      '/operations/vessel-contract',
+      '/operations/tpg-gr-weekly-ops',
+      '/operations/demurrage-records',
+    ],
   },
   {
     dept: 'logistics',

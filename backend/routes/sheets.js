@@ -24,10 +24,20 @@ const {
   PORT_OFF,
 } = require('../services/vesselUpdate');
 const { buildVesselStatusFromDatabase } = require('../services/vesselStatus');
+const { buildVesselCalendarFromDatabases } = require('../services/vesselCalendar');
 const { buildVesselMap } = require('../vesselMap');
 const { buildLiveVessels } = require('../services/liveVessels');
 const { buildExportPlanningFromDatabase } = require('../services/exportPlanning');
 const { buildWeeklyOpsMeetingFromDatabases } = require('../services/weeklyOpsMeeting');
+const {
+  DEMURRAGE_RECORDS_COLUMN,
+  DEMURRAGE_STATUS_COLUMN,
+  SHOW_COLUMN,
+  NIL_DEMURRAGE_COLUMN,
+  buildDemurrageRecords,
+  findRecordAtSheetRow,
+  spreadsheetSafeText,
+} = require('../services/demurrageRecords');
 const { TAB_CONFIGS, buildRows: buildMatchingRows } = require('../services/matchingSales');
 const { getVesselMatchingData, saveVesselMatching, addVesselMatchingPartial, removeVesselMatchingPartial, saveVesselMatchingPartialQty, reconcileVesselMatchingSlots } = require('../services/vesselMatching');
 const { listActiveContractLinks, unlinkActiveContract } = require('../services/contractUnlink');
@@ -482,6 +492,114 @@ router.get('/vessel-update', requireAuth, (req, res) => {
   }
 });
 
+// Operations Demurrage Records - vessel cards backed by DB6 / VESSEL DB.
+router.get('/demurrage-records', requireAuth, (req, res) => {
+  if (!canAccessAnyPage(req.user, '/operations/demurrage-records')) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  try {
+    res.json(buildDemurrageRecords(loadVesselDatabase()));
+  } catch (err) {
+    sendOperationError(res, err, 'Demurrage Records data is temporarily unavailable');
+  }
+});
+
+// Save one vessel's free-form demurrage record to the source sheet and DB6.
+router.post('/demurrage-records/save', requireAuth, serialized(async (req, res) => {
+  if (!canAccessAnyPage(req.user, '/operations/demurrage-records')) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  const row = Number(req.body?.row);
+  const vslId = str(req.body?.vslId).trim();
+  const record = req.body?.record == null ? '' : String(req.body.record);
+  const expectedRecord = req.body?.expectedRecord;
+  const requestedStatus = req.body?.demurrageStatus;
+  const expectedStatus = req.body?.expectedDemurrageStatus;
+  const requestedShow = req.body?.showDemurrage;
+  const expectedShow = req.body?.expectedShowDemurrage;
+  const requestedNil = req.body?.nilDemurrage;
+  const expectedNil = req.body?.expectedNilDemurrage;
+  if (!Number.isInteger(row) || row < 2 || !vslId) {
+    return res.status(400).json({ error: 'A valid vessel row and VSL ID are required' });
+  }
+  if (record.length > 20000) {
+    return res.status(400).json({ error: 'Demurrage record must be 20,000 characters or fewer' });
+  }
+
+  const definition = DATA_DATABASES.find(source => source.name === 'DB6');
+  if (!definition) return res.status(503).json({ error: 'DB6 source is not configured' });
+
+  const snapshot = loadVesselDatabase();
+  const sourceRow = findRecordAtSheetRow(snapshot, row);
+  if (!sourceRow) return res.status(409).json({ error: 'The vessel row moved or no longer exists. Refresh and try again.' });
+
+  const actualVslId = str(sourceRow[0]).trim();
+  if (actualVslId !== vslId) {
+    return res.status(409).json({ error: 'The vessel row changed. Refresh before saving.', expected: vslId, actual: actualVslId });
+  }
+
+  const column = snapshot.columns.indexOf(DEMURRAGE_RECORDS_COLUMN);
+  const statusColumn = snapshot.columns.indexOf(DEMURRAGE_STATUS_COLUMN);
+  const showColumn = snapshot.columns.indexOf(SHOW_COLUMN);
+  const nilDemurrageColumn = snapshot.columns.indexOf(NIL_DEMURRAGE_COLUMN);
+  if (column < 0) return res.status(503).json({ error: 'DB6 is missing the Demurrage Records column' });
+  if (statusColumn < 0) return res.status(503).json({ error: 'DB6 is missing the Demurrage Status column' });
+  if (showColumn < 0) return res.status(503).json({ error: 'DB6 is missing the Show column' });
+  if (nilDemurrageColumn < 0) return res.status(503).json({ error: 'DB6 is missing the Nil Demurrage column' });
+
+  const currentRecord = sourceRow[column] == null ? '' : String(sourceRow[column]);
+  const currentStatus = sourceRow[statusColumn] === true
+    || ['true', 'yes', 'y', '1', 'checked'].includes(str(sourceRow[statusColumn]).trim().toLowerCase());
+  const demurrageStatus = typeof requestedStatus === 'boolean' ? requestedStatus : currentStatus;
+  const currentShow = sourceRow[showColumn] === true
+    || ['true', 'yes', 'y', '1', 'checked'].includes(str(sourceRow[showColumn]).trim().toLowerCase());
+  const showDemurrage = typeof requestedShow === 'boolean' ? requestedShow : currentShow;
+  const currentNil = sourceRow[nilDemurrageColumn] === true
+    || ['true', 'yes', 'y', '1', 'checked'].includes(str(sourceRow[nilDemurrageColumn]).trim().toLowerCase());
+  const nilDemurrage = typeof requestedNil === 'boolean' ? requestedNil : currentNil;
+
+  if (typeof expectedRecord === 'string' && expectedRecord !== currentRecord) {
+    return res.status(409).json({ error: 'This demurrage record was changed by another user. Refresh before saving.', currentRecord });
+  }
+  if (typeof expectedStatus === 'boolean' && expectedStatus !== currentStatus) {
+    return res.status(409).json({ error: 'This demurrage status was changed by another user. Refresh before saving.', currentStatus });
+  }
+  if (typeof expectedShow === 'boolean' && expectedShow !== currentShow) {
+    return res.status(409).json({ error: 'This Show Demurrage setting was changed by another user. Refresh before saving.', currentShow });
+  }
+  if (typeof expectedNil === 'boolean' && expectedNil !== currentNil) {
+    return res.status(409).json({ error: 'This Nil Demurrage setting was changed by another user. Refresh before saving.', currentNil });
+  }
+
+  try {
+    await writeSourceCells(definition, [
+      { range: `${colToA1(column)}${row}`, value: spreadsheetSafeText(record) },
+      { range: `${colToA1(statusColumn)}${row}`, value: demurrageStatus },
+      { range: `${colToA1(showColumn)}${row}`, value: showDemurrage },
+      { range: `${colToA1(nilDemurrageColumn)}${row}`, value: nilDemurrage },
+    ]);
+    updateVesselDatabase([
+      { row, col: column, value: record },
+      { row, col: statusColumn, value: demurrageStatus ? 'TRUE' : 'FALSE' },
+      { row, col: showColumn, value: showDemurrage ? 'TRUE' : 'FALSE' },
+      { row, col: nilDemurrageColumn, value: nilDemurrage ? 'TRUE' : 'FALSE' },
+    ]);
+    broadcastDataUpdated({
+      department: 'operations',
+      resource: 'demurrage-records',
+      action: 'save',
+      row,
+      vslId,
+      databases: ['DB6'],
+    });
+    setTimeout(() => refreshBulkDatabases().catch(err => console.error('Post-demurrage-record DB6 refresh failed:', err.message)), 500);
+    res.json({ saved: true, row, vslId, record, demurrageStatus, showDemurrage, nilDemurrage, source: 'sheet+DB6' });
+  } catch (err) {
+    sendInternalError(res, 502, 'Demurrage record could not be saved', err);
+  }
+}));
+
 // Vessel Daily-Edit - save one batch to the source sheet and DB6.
 router.post('/vessel-update/save', requireAuth, serialized(async (req, res) => {
   if (!canAccessAnyPage(req.user, '/logistics/vessel-update')) {
@@ -796,6 +914,17 @@ router.get('/vessel-status', requireAuth, (req, res) => {
   }
 });
 
+router.get('/vessel-calendar', requireAuth, (req, res) => {
+  if (!canAccessAnyPage(req.user, '/logistics/stock-summary')) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  try {
+    res.json(buildVesselCalendarFromDatabases());
+  } catch (err) {
+    sendInternalError(res, 503, 'Vessel Calendar data is temporarily unavailable', err);
+  }
+});
+
 // Vessel Map uses DB6 for the searchable open-vessel sidebar. VesselFinder
 // resolves the live AIS position by IMO/MMSI when DB6 coordinates are blank.
 router.get('/vessel-map', requireAuth, (req, res) => {
@@ -813,7 +942,7 @@ router.get('/vessel-map', requireAuth, (req, res) => {
 // Live Vessels combines the DB6 voyage board with sanitized server-side
 // AISStream positions. The AISStream credential never leaves the backend.
 router.get('/live-vessels', requireAuth, (req, res) => {
-  if (!canAccessAnyPage(req.user, '/logistics/live-vessels')) {
+  if (!canAccessAnyPage(req.user, '/logistics/live-vessels', '/commercial/vessel-info')) {
     return res.status(403).json({ error: 'Access denied' });
   }
   try {

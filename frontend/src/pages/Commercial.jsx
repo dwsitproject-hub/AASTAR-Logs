@@ -1,8 +1,11 @@
 import React from 'react';
 import DepartmentLanding from './DepartmentLanding';
+import { DEPARTMENTS } from '../navConfig';
+import { useAuth } from '../context/AuthContext';
+
 export default function Commercial() {
-  return <DepartmentLanding department="commercial" label="Commercial" color="#3498db" subTabs={[
-    { label: 'Open Shipments', path: '/commercial/open-shipments' },
-    { label: 'KPN Export', path: '/commercial/kpn-export' },
-  ]} />;
+  const { hasTabAccess } = useAuth();
+  const dept = DEPARTMENTS.find(item => item.dept === 'commercial');
+  const subTabs = dept.tabs.filter(tab => hasTabAccess(tab.path));
+  return <DepartmentLanding department="commercial" label={dept.label} color={dept.color} subTabs={subTabs} />;
 }

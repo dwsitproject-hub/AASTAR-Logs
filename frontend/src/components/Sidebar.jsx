@@ -30,7 +30,7 @@ const NAV_ITEMS = [
   {
     label: 'Commercial', path: '/commercial', dept: 'commercial', icon: Icons.commercial,
     children: [
-      { label: 'Open Shipments', path: '/commercial/open-shipments' },
+      { label: 'Vessel info', path: '/commercial/vessel-info' },
       { label: 'KPN Export', path: '/commercial/kpn-export' },
     ],
   },
@@ -40,6 +40,7 @@ const NAV_ITEMS = [
       { label: 'Contract Dashboard', path: '/operations/contract-dashboard' },
       { label: 'Vessel Contract', path: '/operations/vessel-contract' },
       { label: 'TPG/GR Weekly Ops Meeting', path: '/operations/tpg-gr-weekly-ops' },
+      { label: 'Demurrage Records', path: '/operations/demurrage-records' },
     ],
   },
   {
@@ -47,8 +48,7 @@ const NAV_ITEMS = [
     children: [
       { label: 'Stock Summary', path: '/logistics/stock-summary' },
       { label: 'Vessel Status', path: '/logistics/vessel-status' },
-      { label: 'Vessel Map', path: '/logistics/vessel-map' },
-      { label: 'Live Vessels', path: '/logistics/live-vessels' },
+      { label: 'Vessel info', path: '/logistics/live-vessels' },
       { label: 'Export Summary', path: '/logistics/export-summary' },
       { label: 'Export Summary Total', path: '/logistics/export-summary-total' },
       { label: 'Vessel Update', path: '/logistics/vessel-update' },

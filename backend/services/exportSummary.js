@@ -303,6 +303,7 @@ function getEomStockForSection(sectionKey, eomLookup, monthKey) {
       case 'SPC': return pk.indexOf('SPC') === 0;
       case 'EUP_OTHER': return pk.indexOf('EUP') === 0 && pk.indexOf('BONTANG') === -1 && pk.indexOf('TANJUNG PURA') === -1 && pk.indexOf('TJ PURA') === -1;
       case 'TPG': return pk.indexOf('TPG') === 0;
+      case 'GLM_PORT_KLANG': return pk.indexOf('GLM') === 0 && pk.indexOf('PORT KLANG') !== -1;
       default: return false;
     }
   };
@@ -371,7 +372,8 @@ function buildSections(entries, eomLookup, monthKey) {
     PMC: { key: 'PMC', label: 'PMC', rows: [] },
     SPC: { key: 'SPC', label: 'SPC', rows: [] },
     EUP_OTHER: { key: 'EUP_OTHER', label: 'EUP - Other Ports', rows: [] },
-    TPG: { key: 'TPG', label: 'TPG - Pasir Gudang / Tanjung Langsat', rows: [] }
+    TPG: { key: 'TPG', label: 'TPG - Pasir Gudang / Tanjung Langsat', rows: [] },
+    GLM_PORT_KLANG: { key: 'GLM_PORT_KLANG', label: 'GLM - PORT KLANG', rows: [] }
   };
   const otherSections = {};
 
@@ -381,6 +383,8 @@ function buildSections(entries, eomLookup, monthKey) {
       if (portUpper.indexOf('BONTANG') !== -1) sections.EUP_BONTANG.rows.push(r);
       else if (portUpper.indexOf('TANJUNG PURA') !== -1 || portUpper.indexOf('TJ PURA') !== -1 || portUpper.indexOf('T.PURA') !== -1) sections.EUP_TJ_PURA.rows.push(r);
       else sections.EUP_OTHER.rows.push(r);
+    } else if (r.shipper === 'GLM' && portUpper.indexOf('PORT KLANG') !== -1) {
+      sections.GLM_PORT_KLANG.rows.push(r);
     } else if (sections[r.shipper]) sections[r.shipper].rows.push(r);
     else {
       if (!otherSections[r.shipper]) otherSections[r.shipper] = { label: r.shipper, rows: [], isJPN: r.shipper === 'JPN' };
@@ -389,7 +393,7 @@ function buildSections(entries, eomLookup, monthKey) {
   });
 
   const primary = [];
-  ['EUP_BONTANG','EUP_TJ_PURA','PMC','SPC','EUP_OTHER','TPG'].forEach(key => {
+  ['EUP_BONTANG','EUP_TJ_PURA','PMC','SPC','EUP_OTHER','TPG','GLM_PORT_KLANG'].forEach(key => {
     if (sections[key].rows.length > 0) {
       sections[key].eomStock = getEomStockForSection(key, eomLookup, monthKey);
       primary.push(sections[key]);

@@ -15,17 +15,16 @@ import DecoyPage from './pages/DecoyPage';
 // eagerly held in one large bundle. This lowers baseline memory per session.
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Commercial = lazy(() => import('./pages/Commercial'));
-const OpenShipments = lazy(() => import('./pages/commercial/OpenShipments'));
 const KpnExport = lazy(() => import('./pages/commercial/KpnExport'));
 const Operations = lazy(() => import('./pages/Operations'));
 const ContractDashboard = lazy(() => import('./pages/operations/ContractDashboard'));
 const WeeklyOpsMeeting = lazy(() => import('./pages/operations/WeeklyOpsMeeting'));
+const DemurrageRecords = lazy(() => import('./pages/operations/DemurrageRecords'));
 const Logistics = lazy(() => import('./pages/Logistics'));
 const ExportSummary = lazy(() => import('./pages/logistics/ExportSummary'));
 const ExportSummaryTotal = lazy(() => import('./pages/logistics/ExportSummaryTotal'));
 const StockSummary = lazy(() => import('./pages/logistics/StockSummary'));
 const VesselStatus = lazy(() => import('./pages/logistics/VesselStatus'));
-const VesselMap = lazy(() => import('./pages/logistics/VesselMap'));
 const LiveVessels = lazy(() => import('./pages/logistics/LiveVessels'));
 const VesselUpdateSplit = lazy(() => import('./pages/logistics/VesselUpdateSplit'));
 const VesselContract = lazy(() => import('./pages/logistics/VesselContract'));
@@ -83,16 +82,19 @@ function AppLayout() {
           <Routes>
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/commercial" element={<ProtectedRoute department="commercial"><Commercial /></ProtectedRoute>} />
-            <Route path="/commercial/open-shipments" element={<ProtectedRoute tab="/commercial/open-shipments"><OpenShipments /></ProtectedRoute>} />
+            <Route path="/commercial/open-shipments" element={<Navigate to="/commercial/vessel-info" replace />} />
+            <Route path="/commercial/vessel-info" element={<ProtectedRoute tab="/commercial/vessel-info"><LiveVessels /></ProtectedRoute>} />
             <Route path="/commercial/kpn-export" element={<ProtectedRoute tab="/commercial/kpn-export"><KpnExport /></ProtectedRoute>} />
             <Route path="/operations" element={<ProtectedRoute department="operations"><Operations /></ProtectedRoute>} />
             <Route path="/operations/contract-dashboard" element={<ProtectedRoute tab="/operations/contract-dashboard"><ContractDashboard /></ProtectedRoute>} />
             <Route path="/operations/vessel-contract" element={<ProtectedRoute tab="/operations/vessel-contract"><VesselContract /></ProtectedRoute>} />
             <Route path="/operations/tpg-gr-weekly-ops" element={<ProtectedRoute tab="/operations/tpg-gr-weekly-ops"><WeeklyOpsMeeting /></ProtectedRoute>} />
+            <Route path="/operations/demurrage-records" element={<ProtectedRoute tab="/operations/demurrage-records"><DemurrageRecords /></ProtectedRoute>} />
             <Route path="/logistics" element={<ProtectedRoute department="logistics"><Logistics /></ProtectedRoute>} />
             <Route path="/logistics/stock-summary" element={<ProtectedRoute tab="/logistics/stock-summary"><StockSummary /></ProtectedRoute>} />
             <Route path="/logistics/vessel-status" element={<ProtectedRoute tab="/logistics/vessel-status"><VesselStatus /></ProtectedRoute>} />
-            <Route path="/logistics/vessel-map" element={<ProtectedRoute tab="/logistics/vessel-map"><VesselMap /></ProtectedRoute>} />
+            <Route path="/logistics/vessel-calendar" element={<Navigate to="/logistics/stock-summary" replace />} />
+            <Route path="/logistics/vessel-map" element={<Navigate to="/logistics/live-vessels" replace />} />
             <Route path="/logistics/live-vessels" element={<ProtectedRoute tab="/logistics/live-vessels"><LiveVessels /></ProtectedRoute>} />
             <Route path="/logistics/export-summary" element={<ProtectedRoute tab="/logistics/export-summary"><ExportSummary /></ProtectedRoute>} />
             <Route path="/logistics/export-summary-total" element={<ProtectedRoute tab="/logistics/export-summary-total"><ExportSummaryTotal /></ProtectedRoute>} />

@@ -47,7 +47,7 @@ test('existing access becomes roles once: admins get Administrator, equal access
   assert.equal(user('Ann').role_id, user('Bob').role_id, 'same pages, same role');
   assert.equal(user('Ann').role_name, 'Logistics (2 pages)');
   assert.equal(user('Cat').role_name, 'Commercial + Finance & Accounting', 'a department with tabs means all its tabs');
-  assert.deepEqual(JSON.parse(user('Cat').tab_permissions), ['/commercial/open-shipments', '/commercial/kpn-export']);
+  assert.deepEqual(JSON.parse(user('Cat').tab_permissions), ['/commercial/vessel-info', '/commercial/kpn-export']);
   assert.deepEqual(JSON.parse(user('Cat').permissions), ['finance']);
   // Five departments do not fit 60 characters even without page counts.
   assert.equal(user('Dan').role_name, 'Custom access', 'too long a description becomes a generic name, never cut mid-word');

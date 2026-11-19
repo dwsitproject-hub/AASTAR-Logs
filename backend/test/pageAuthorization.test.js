@@ -59,10 +59,12 @@ test('page authorization does not treat one department tab as every tab', async 
     '/api/sheets/contract-dashboard',
     '/api/sheets/vessel-contract/pending',
     '/api/sheets/weekly-ops-meeting',
+    '/api/sheets/demurrage-records',
     '/api/sheets/open-shipments',
     '/api/sheets/export-planning',
     '/api/sheets/vessel-update',
     '/api/sheets/stock-summary',
+    '/api/sheets/vessel-calendar',
     '/api/sheets/vessel-matching',
     '/api/sheets/matching-sales',
   ];

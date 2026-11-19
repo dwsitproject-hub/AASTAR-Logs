@@ -20,7 +20,6 @@ const DATE_TIME_FIELDS = [
 ];
 
 // Canonical dropdown values per spec
-const OPS_OPTIONS = ['Pending Vsl','Pending Acceptance','Pending Fixture','Pending Nom','Pending SI','Done','Pending LC','Pending Payment','Pending Tender','Pending SD','Pending Arrival','Pending Sales'];
 const SHIPPER_OPTIONS = ['3P','PMC','SPC','EUP','TPG','GLM','JPN','Disch'];
 const ENTITY_OPTIONS = ['A*','A*JV','GR','JPN','3P'];
 const LAYTIME_START_OPTIONS = ['NOR +6', 'All Fast', 'Laycan NOR+6', 'Laycan All Fast'];
@@ -33,7 +32,7 @@ const VESSEL_COLS = [
   ['imo', 7, 'num'],
   ['mmsi', 8, 'num'],
   ['status', 9, 'sel-status'],
-  ['ops', 10, 'sel'],
+  ['ops', 10, 'text', 'Vessel max load'],
   ['demm_rate', 14, 'num'],
   ['laytime_rate', 15, 'num'],
   ['laytime_starts', 16, 'sel-laytime-starts'],
@@ -549,7 +548,7 @@ function FieldCell({ label, value, options, kind, onChange, inputBg, borderCol, 
 
   let editor;
   if (kind === 'sel' || kind === 'sel-charterer') {
-    const list = kind === 'sel-charterer' ? (options?.charterers || []) : label === 'entity' ? ENTITY_OPTIONS : label === 'ops' ? OPS_OPTIONS : [];
+    const list = kind === 'sel-charterer' ? (options?.charterers || []) : label === 'entity' ? ENTITY_OPTIONS : [];
     const choices = val && !list.includes(val) ? [val, ...list] : list;
     editor = (
       <select value={val} onChange={e => handle(e.target.value)} style={inp}>
@@ -810,12 +809,7 @@ function AddEntryModal({ options, onClose, onSubmit, submitting, isDark }) {
             </div>
             <div><label style={lab}>IMO</label><input value={vessel.imo} onChange={e => setV('imo', e.target.value)} style={inp} /></div>
             <div><label style={lab}>MMSI</label><input value={vessel.mmsi} onChange={e => setV('mmsi', e.target.value)} style={inp} /></div>
-            <div><label style={lab}>Ops</label>
-              <select value={vessel.ops} onChange={e => setV('ops', e.target.value)} style={inp}>
-                <option value=""></option>
-                {OPS_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
+            <div><label style={lab}>Vessel max load</label><input value={vessel.ops} onChange={e => setV('ops', e.target.value)} style={inp} placeholder="e.g. 10,000 mts" /></div>
             <div><label style={lab}>Demm Rate</label><input type="number" value={vessel.demm_rate} onChange={e => setV('demm_rate', e.target.value)} style={inp} placeholder="e.g. 5000" /></div>
             <div><label style={lab}>Laytime Rate</label><input type="number" value={vessel.laytime_rate} onChange={e => setV('laytime_rate', e.target.value)} style={inp} placeholder="e.g. 5000" /></div>
             <div><label style={lab}>Laytime Starts</label>

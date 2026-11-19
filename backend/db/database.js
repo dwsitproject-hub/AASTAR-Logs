@@ -204,7 +204,7 @@ function initDb() {
   if (!db.prepare('SELECT 1 FROM app_migrations WHERE name = ?').get(navigationMigration)) {
     db.transaction(() => {
       const subtabMigration = {
-        commercial: ['/commercial/open-shipments'],
+        commercial: ['/commercial/vessel-info'],
         operations: ['/operations/contract-dashboard', '/operations/vessel-contract'],
         logistics: [
           '/logistics/stock-summary', '/logistics/vessel-status',
@@ -256,7 +256,7 @@ function initDb() {
       for (const row of rows) {
         if (row.is_admin === 1) continue;
         let tabs; try { tabs = JSON.parse(row.tab_permissions || '[]'); } catch { tabs = []; }
-        if (tabs.includes('/commercial/open-shipments') && !tabs.includes('/commercial/kpn-export')) {
+        if (tabs.includes('/commercial/vessel-info') && !tabs.includes('/commercial/kpn-export')) {
           tabs.push('/commercial/kpn-export');
           update.run(JSON.stringify(tabs), row.id);
         }
@@ -299,6 +299,38 @@ function initDb() {
       }
       db.prepare('INSERT INTO app_migrations (name, applied_at) VALUES (?, ?)')
         .run(exportSummaryTotalMigration, new Date().toISOString());
+    })();
+  }
+
+  // Preserve existing grants when retired navigation paths are renamed.
+  const vesselInfoMigration = '2026-11-vessel-info-navigation';
+  if (!db.prepare('SELECT 1 FROM app_migrations WHERE name = ?').get(vesselInfoMigration)) {
+    db.transaction(() => {
+      const migrateTabs = raw => {
+        let tabs; try { tabs = JSON.parse(raw || '[]'); } catch { tabs = []; }
+        const hadCommercialShipments = tabs.includes('/commercial/open-shipments');
+        const hadVesselMap = tabs.includes('/logistics/vessel-map');
+        tabs = tabs.filter(path => path !== '/commercial/open-shipments' && path !== '/logistics/vessel-map');
+        if (hadCommercialShipments && !tabs.includes('/commercial/vessel-info')) tabs.push('/commercial/vessel-info');
+        if (hadVesselMap && !tabs.includes('/logistics/live-vessels')) tabs.push('/logistics/live-vessels');
+        return JSON.stringify(tabs);
+      };
+
+      const users = db.prepare('SELECT id, is_admin, tab_permissions FROM users').all();
+      const updateUser = db.prepare('UPDATE users SET tab_permissions = ? WHERE id = ?');
+      for (const user of users) {
+        if (user.is_admin !== 1) updateUser.run(migrateTabs(user.tab_permissions), user.id);
+      }
+
+      const hasRoles = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'roles'").get();
+      if (hasRoles) {
+        const roles = db.prepare('SELECT id, tab_permissions FROM roles').all();
+        const updateRole = db.prepare('UPDATE roles SET tab_permissions = ? WHERE id = ?');
+        for (const role of roles) updateRole.run(migrateTabs(role.tab_permissions), role.id);
+      }
+
+      db.prepare('INSERT INTO app_migrations (name, applied_at) VALUES (?, ?)')
+        .run(vesselInfoMigration, new Date().toISOString());
     })();
   }
 

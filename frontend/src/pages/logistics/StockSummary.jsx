@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import api from '../../services/api';
 import useDataRefresh from '../../services/useDataRefresh';
+import VesselCalendar from './VesselCalendar';
 import {
   colorFor, DEFAULT_STOCK_CARGOES, fmtDate, normCargo,
   portsMatch, shippersMatch, cargoesMatch, shouldCombinePfadCargo,
@@ -289,6 +290,9 @@ export default function StockSummary() {
           )}
         </>
       )}
+      <section style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border)' }} aria-label="Vessel Calendar">
+        <VesselCalendar />
+      </section>
     </div>
   );
 }
