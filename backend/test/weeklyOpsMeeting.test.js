@@ -6,6 +6,9 @@ const {
   buildLocalDeliveries,
   buildEvac,
   buildExports,
+  buildVesselBuyerLookup,
+  buildWeeklyDemurrage,
+  buildUnmatchedGrVessels,
   checkbox,
   displayDate,
 } = require('../services/weeklyOpsMeeting');
@@ -86,6 +89,53 @@ test('exports do not substitute contract cargo when Vessel DB cargo is blank', (
   assert.equal(result.tpg[0].isPartialShipment, false);
   assert.equal(result.tpg[0].partialQuantity, null);
   assert.equal(result.tpg[0].shipmentQuantity, 2000);
+});
+
+test('weekly demurrage includes only GR vessels selected by the Show checkbox', () => {
+  const buyers = buildVesselBuyerLookup([
+    { main_vsl_id_2: 'VSL_26_0042', main_buyer: 'CBC' },
+    { main_vsl_id_2: 'VSL_26_0042', main_buyer: 'MOEVE ASIA' },
+    { main_vsl_id_2: 'VSL_26_0042', main_buyer: 'CBC' },
+  ]);
+  const rows = buildWeeklyDemurrage([
+    {
+      row: 12, vslId: 'VSL_26_0042', vessel: 'MT GR TEST', entity: 'GR', status: 'OPEN',
+      showDemurrage: true, demurrageStatus: false, demurrageRate: '12000', laytimeRate: '250',
+      laytimeStarts: 'NOR +6', estimatedDemurrage: '25000', demurrageRecords: 'Claim under review',
+      ports: [
+        { type: 'Load', port: 'Lubuk Gaung, ID', quantity: '3,500', cargo: 'PFAD', eta: '12 Aug', etc: '14 Aug' },
+        { type: 'Discharge', port: 'Kandla, IN', quantity: '', cargo: '', eta: '', etc: '' },
+      ],
+    },
+    { row: 13, vslId: 'VSL_26_0043', vessel: 'MT HIDDEN', entity: 'GR', showDemurrage: false, ports: [] },
+    { row: 14, vslId: 'VSL_26_0044', vessel: 'MT TPG', entity: 'A*', showDemurrage: true, ports: [] },
+  ], buyers);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].vessel, 'MT GR TEST');
+  assert.equal(rows[0].cargoSummary, '3,500 PFAD');
+  assert.equal(rows[0].loadport, 'Lubuk Gaung, ID');
+  assert.equal(rows[0].buyer, 'CBC, MOEVE ASIA');
+  assert.equal(rows[0].settled, false);
+});
+
+test('unmatched GR vessels use active links and return one row per open loadport', () => {
+  const rows = buildUnmatchedGrVessels([
+    {
+      vsl_id: 'vsl_26_1000', vessel: 'MT GR TEST', entity: 'GR', status: 'OPEN', charterer: 'AlphaStar', nominated: true,
+      ports: [
+        { vslid: 'VSL_26_1000_1', port_name: 'Bontang, ID', status_ld: 'Load', status_oc: 'OPEN', port_entity: 'GR', shipper: 'EUP', qty: '5000', l_cargo: 'ROL', laycan: 'NOV', cr: '1 Nov', eta: '2 Nov' },
+        { vslid: 'VSL_26_1000_2', port_name: 'Tanjung Pura, ID', status_ld: 'Load', status_oc: 'OPEN', port_entity: 'GR', shipper: 'EUP', qty: '3000', l_cargo: 'PFAD' },
+        { vslid: 'VSL_26_1000_3', port_name: 'Kandla, IN', status_ld: 'Discharge', port_entity: 'GR', shipper: 'Discharge' },
+      ],
+    },
+    { vsl_id: 'vsl_26_1001', vessel: 'MT CLOSED', entity: 'GR', status: 'CLOSED', ports: [{ vslid: 'VSL_26_1001_1', port_name: 'Bontang, ID', status_ld: 'Load', port_entity: 'GR' }] },
+    { vsl_id: 'vsl_26_1002', vessel: 'MT OTHER', entity: 'A*', status: 'OPEN', ports: [{ vslid: 'VSL_26_1002_1', port_name: 'Batam, ID', status_ld: 'Load', port_entity: 'A*' }] },
+  ], new Map([['sales-match-1', 'VSL_26_1000_1']]));
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].vslId, 'VSL_26_1000_2');
+  assert.equal(rows[0].cargoSummary, '3,000mts PFAD');
+  assert.equal(rows[0].nominated, true);
 });
 
 test('GLM operations tabs are configured as independent databases', () => {

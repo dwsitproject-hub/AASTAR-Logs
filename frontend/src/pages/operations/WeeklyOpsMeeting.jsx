@@ -1,7 +1,13 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import api from '../../services/api';
 import useDataRefresh from '../../services/useDataRefresh';
-import { buildWeeklyOpsCards, fitPresentationScale, relativeCardIndex } from './weeklyOpsPresentation';
+import {
+  balancePresentationRows,
+  buildWeeklyOpsCards,
+  buildWeeklyOpsPresentationCards,
+  fitPresentationScale,
+  relativeCardIndex,
+} from './weeklyOpsPresentation';
 import './WeeklyOpsMeeting.css';
 
 const RefreshIcon = () => (
@@ -176,29 +182,131 @@ function ExportTable({ rows, emptyMessage, showStage = false }) {
   );
 }
 
+function UnmatchedVesselsTable({ rows }) {
+  return (
+    <div className="wom-table-scroll">
+      <table className="wom-table wom-unmatched-table">
+        <thead><tr>
+          <th>Vessel</th><th>VSL ID</th><th>Charterer</th><th>Shipper</th><th>Loadport</th>
+          <th>Cargo / Qty</th><th>Laycan</th><th>CR</th><th>ETA</th><th>ETB</th><th>ETC</th><th>Remarks</th><th>Nominated</th>
+        </tr></thead>
+        <tbody>
+          {rows.map(row => (
+            <tr key={row.id}>
+              <td className="wom-vessel">{row.vessel || 'TBN'}</td><td>{row.vslId || '-'}</td>
+              <td>{row.charterer || '-'}</td><td>{row.shipper || '-'}</td><td>{row.loadport || '-'}</td>
+              <td className="wom-cargo-summary">{row.cargoSummary || '-'}</td><td>{row.laycan || '-'}</td>
+              <td>{row.cr || '-'}</td><td>{row.eta || '-'}</td><td>{row.etb || '-'}</td><td>{row.etc || '-'}</td>
+              <td className="wom-wrap">{row.remarks || '-'}</td>
+              <td className="wom-center"><CheckCell checked={row.nominated} label="Vessel nominated" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DemurrageCards({ rows, presentation = false }) {
+  const parseCommentRows = value => String(value || '-')
+    .split(/\r?\n/)
+    .map((line, index) => ({
+      cells: line.split(/\t+| {2,}/).map(cell => cell.trim()).filter(Boolean),
+      index,
+    }));
+
+  const renderCommentRow = ({ cells, index }) => {
+
+    if (!cells.length) {
+      return <div aria-hidden="true" className="wom-demurrage-comment-row is-empty" key={`empty-${index}`} />;
+    }
+
+    if (cells.length === 1) {
+      return (
+        <div className="wom-demurrage-comment-row" key={`${cells[0]}-${index}`}>
+          <span className="wom-demurrage-comment-freeform">{cells[0]}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="wom-demurrage-comment-row" key={`${cells[0]}-${index}`}>
+        <span className="wom-demurrage-comment-label">{cells[0]}</span>
+        {cells.length === 2 ? (
+          <span className="wom-demurrage-comment-value is-wide">{cells[1]}</span>
+        ) : (
+          <>
+            <span className="wom-demurrage-comment-detail">{cells[1]}</span>
+            <span className="wom-demurrage-comment-value">{cells.slice(2).join(' ')}</span>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderComments = value => {
+    const commentRows = parseCommentRows(value);
+    if (!presentation) return commentRows.map(renderCommentRow);
+    const columns = balancePresentationRows(commentRows, 2);
+    return columns.map((column, columnIndex) => (
+      <div className="wom-demurrage-comment-column" key={`column-${columnIndex}`}>
+        {column.map(renderCommentRow)}
+      </div>
+    ));
+  };
+
+  return (
+    <div className={`wom-demurrage-grid${presentation ? ' is-presentation' : ''}`}>
+      {rows.map(row => (
+        <article className="wom-demurrage-card" key={row.id}>
+          <div className="wom-demurrage-summary">
+            <header className="wom-demurrage-card-header">
+              <h4>{row.vessel || 'TBN'}</h4>
+              <span>{row.vslId || '-'}</span>
+            </header>
+            <dl className="wom-demurrage-facts">
+              <div><dt>Buyer</dt><dd>{row.buyer || '-'}</dd></div>
+              <div><dt>Demm Rate PDPR</dt><dd>{formatNumber(row.demurrageRate)}</dd></div>
+              <div><dt>Load Rate</dt><dd>{formatNumber(row.laytimeRate)}</dd></div>
+              <div><dt>Laytime Starts</dt><dd>{row.laytimeStarts || '-'}</dd></div>
+            </dl>
+          </div>
+          <div className="wom-demurrage-comments">
+            <h5>Comments</h5>
+            <div className={`wom-demurrage-comment-table${presentation ? ' is-columnar' : ''}`}>{renderComments(row.demurrageRecords)}</div>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function MeetingCard({ card, presentation = false }) {
   return (
-    <section className={`wom-card${presentation ? ' wom-presentation-card' : ''}`}>
+    <section className={`wom-card${presentation ? ' wom-presentation-card' : ''}${card.gapBefore && !presentation ? ' has-gap-before' : ''}`}>
       <SectionHeader title={card.title} count={card.rows.length} note={card.note} />
       {card.kind === 'local' ? <LocalDeliveriesTable rows={card.rows} /> : null}
       {card.kind === 'import' ? <EvacTable rows={card.rows} /> : null}
       {card.kind === 'export' ? <ExportTable rows={card.rows} showStage={card.showStage} /> : null}
+      {card.kind === 'unmatched-vessel' ? <UnmatchedVesselsTable rows={card.rows} /> : null}
+      {card.kind === 'demurrage' ? <DemurrageCards rows={card.rows} presentation={presentation} /> : null}
     </section>
   );
 }
 
 export function WeeklyOpsMeetingView({ data, refreshing = false, onRefresh = () => {} }) {
   const cards = useMemo(() => buildWeeklyOpsCards(data), [data]);
+  const presentationCards = useMemo(() => buildWeeklyOpsPresentationCards(cards), [cards]);
   const [presentedCardId, setPresentedCardId] = useState(null);
   const presentationStageRef = useRef(null);
   const presentationContentRef = useRef(null);
   const [presentationFit, setPresentationFit] = useState({ scale: 1, width: null, height: null });
-  const presentedIndex = cards.findIndex(card => card.id === presentedCardId);
-  const presentedCard = presentedIndex >= 0 ? cards[presentedIndex] : null;
+  const presentedIndex = presentationCards.findIndex(card => card.id === presentedCardId);
+  const presentedCard = presentedIndex >= 0 ? presentationCards[presentedIndex] : null;
 
   const startPresentation = async () => {
-    if (!cards.length) return;
-    setPresentedCardId(cards[0].id);
+    if (!presentationCards.length) return;
+    setPresentedCardId(presentationCards[0].id);
     try {
       await document.documentElement.requestFullscreen?.();
     } catch {
@@ -212,15 +320,15 @@ export function WeeklyOpsMeetingView({ data, refreshing = false, onRefresh = () 
   };
 
   const movePresentation = direction => {
-    if (!cards.length) return;
-    const currentIndex = Math.max(0, cards.findIndex(card => card.id === presentedCardId));
-    setPresentedCardId(cards[relativeCardIndex(currentIndex, direction, cards.length)].id);
+    if (!presentationCards.length) return;
+    const currentIndex = Math.max(0, presentationCards.findIndex(card => card.id === presentedCardId));
+    setPresentedCardId(presentationCards[relativeCardIndex(currentIndex, direction, presentationCards.length)].id);
   };
 
   useEffect(() => {
     if (!presentedCardId) return undefined;
-    if (!cards.some(card => card.id === presentedCardId)) {
-      setPresentedCardId(cards[0]?.id || null);
+    if (!presentationCards.some(card => card.id === presentedCardId)) {
+      setPresentedCardId(presentationCards[0]?.id || null);
     }
     const handleKeyDown = event => {
       if (event.key === 'ArrowRight') {
@@ -235,7 +343,7 @@ export function WeeklyOpsMeetingView({ data, refreshing = false, onRefresh = () 
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cards, presentedCardId]);
+  }, [presentationCards, presentedCardId]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -300,7 +408,7 @@ export function WeeklyOpsMeetingView({ data, refreshing = false, onRefresh = () 
           <div className="wom-presentation-toolbar">
             <div>
               <strong>{presentedCard.title}</strong>
-              <span aria-live="polite">{presentedIndex + 1} / {cards.length}</span>
+              <span aria-live="polite">{presentedIndex + 1} / {presentationCards.length}</span>
             </div>
             <div className="wom-presentation-actions">
               <button type="button" onClick={() => movePresentation(-1)} title="Previous card" aria-label="Previous card"><ArrowIcon direction="left" /></button>
@@ -354,8 +462,8 @@ export default function WeeklyOpsMeeting() {
 
   useEffect(() => { load(); }, []);
   useDataRefresh({
-    databases: ['DB5', 'DB6', 'DB12', 'DB13', 'DB14', 'DB15', 'DB16', 'DB17'],
-    resources: ['bulk-databases', 'vessel-update'],
+    databases: ['DB5', 'DB6', 'DB10', 'DB12', 'DB13', 'DB14', 'DB15', 'DB16', 'DB17'],
+    resources: ['bulk-databases', 'vessel-update', 'demurrage-records'],
     fallbackMs: 60000,
     onRefresh: ({ reason }) => load({ silent: true, force: reason !== 'fallback' }),
   });

@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const { loadVesselDatabase, buildVesselList } = require('./vesselUpdate');
+const { buildDemurrageRecords } = require('./demurrageRecords');
+const { loadActiveAssignments } = require('./vesselLinkStore');
 
 const DATA_DIR = process.env.DATA_DATABASE_DIR || path.join(__dirname, '../data/databases');
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -142,6 +144,62 @@ function buildVesselPortLookup(vesselRows) {
   return { byVslId, byVessel };
 }
 
+function realVslId(value) {
+  const id = canonical(value);
+  return id && id !== 'VSL000000' ? id : '';
+}
+
+function buildUnmatchedGrVessels(vessels, activeAssignments = new Map()) {
+  const matchedVslIds = new Set(
+    [...activeAssignments.values()].map(realVslId).filter(Boolean),
+  );
+  const rows = [];
+
+  for (const vessel of vessels || []) {
+    if (canonical(vessel.status) !== 'OPEN') continue;
+    for (let index = 0; index < (vessel.ports || []).length; index += 1) {
+      const port = vessel.ports[index];
+      if (!text(port.port_name)) continue;
+      if (['DISCHARGE', 'DISCH'].includes(canonical(port.status_ld))) continue;
+      if (canonical(port.status_oc) === 'CLOSED') continue;
+
+      const entity = text(port.port_entity) || text(vessel.entity);
+      if (canonical(entity) !== 'GR') continue;
+
+      const sourceVslId = text(port.vslid);
+      const portVslId = realVslId(sourceVslId);
+      if (sourceVslId && !portVslId) continue;
+      if (portVslId && matchedVslIds.has(portVslId)) continue;
+
+      const quantity = numberValue(port.qty);
+      const cargo = text(port.l_cargo);
+      rows.push({
+        id: `${text(vessel.vsl_id) || text(vessel.vessel)}-${sourceVslId || index + 1}`,
+        vessel: text(vessel.vessel) || 'TBN',
+        vesselVslId: text(vessel.vsl_id),
+        vslId: sourceVslId,
+        charterer: text(vessel.charterer),
+        entity,
+        status: text(vessel.status),
+        nominated: Boolean(vessel.nominated),
+        shipper: text(port.shipper),
+        loadport: text(port.port_name),
+        cargo,
+        quantity,
+        cargoSummary: [quantity == null ? '' : `${displayQuantity(quantity)}mts`, cargo].filter(Boolean).join(' '),
+        laycan: text(port.laycan),
+        cr: text(port.cr),
+        eta: text(port.eta),
+        etb: text(port.etb),
+        etc: text(port.etc),
+        remarks: text(vessel.remarks),
+      });
+    }
+  }
+
+  return rows;
+}
+
 function mapExport(row, vesselLookup) {
   const exact = vesselLookup.byVslId.get(canonical(row.main_vsl_id_2));
   const vessel = exact?.vessel || vesselLookup.byVessel.get(canonical(row.main_vessel_name));
@@ -237,6 +295,45 @@ function buildExports(rows, vesselLookup, now = new Date()) {
   return { tpgGlm, tpg: tpgGlm, gr };
 }
 
+function buildVesselBuyerLookup(rows) {
+  const buyersByVessel = new Map();
+  for (const row of rows || []) {
+    const vslId = canonical(row.main_vsl_id_2);
+    const buyer = text(row.main_buyer);
+    if (!vslId || !buyer) continue;
+    if (!buyersByVessel.has(vslId)) buyersByVessel.set(vslId, new Set());
+    buyersByVessel.get(vslId).add(buyer);
+  }
+  return new Map([...buyersByVessel].map(([vslId, buyers]) => [vslId, [...buyers].join(', ')]));
+}
+
+function buildWeeklyDemurrage(records, buyerLookup = new Map()) {
+  return (records || [])
+    .filter(record => canonical(record.entity) === 'GR' && record.showDemurrage)
+    .map(record => {
+      const loadports = (record.ports || []).filter(port => canonical(port.type) === 'LOAD');
+      const uniqueText = values => [...new Set(values.map(text).filter(Boolean))].join(', ');
+      return {
+        id: record.vslId || String(record.row || ''),
+        vslId: record.vslId,
+        vessel: record.vessel,
+        buyer: buyerLookup.get(canonical(record.vslId)) || '',
+        status: record.status,
+        cargoSummary: uniqueText(loadports.map(port => [port.quantity, port.cargo].filter(Boolean).join(' '))),
+        loadport: uniqueText(loadports.map(port => port.port)),
+        eta: uniqueText(loadports.map(port => port.eta)),
+        etc: uniqueText(loadports.map(port => port.etc)),
+        demurrageRate: record.demurrageRate,
+        laytimeRate: record.laytimeRate,
+        laytimeStarts: record.laytimeStarts,
+        estimatedDemurrage: record.estimatedDemurrage,
+        demurrageRecords: record.demurrageRecords,
+        settled: Boolean(record.demurrageStatus),
+      };
+    })
+    .sort((left, right) => String(right.vslId || '').localeCompare(String(left.vslId || ''), undefined, { numeric: true, sensitivity: 'base' }));
+}
+
 function buildWeeklyOpsMeetingFromDatabases({ now = new Date() } = {}) {
   const db5 = readDatabase('DB5', 'main_shipment_file_with_shadow_gr', '_main_row');
   const db12 = readDatabase('DB12', 'tpg_imports', '_sheet_row');
@@ -250,7 +347,17 @@ function buildWeeklyOpsMeetingFromDatabases({ now = new Date() } = {}) {
   const glmLocalDeliveries = buildLocalDeliveries(db16.rows, db17.rows);
   const tpgImports = buildEvac(db12.rows);
   const glmImports = buildEvac(db15.rows);
+  const vesselList = buildVesselList(vesselSnapshot.rows, {
+    statusFilter: 'all',
+    query: '',
+    sheetRows: vesselSnapshot.sheetRows,
+  }).vessels;
   const exports = buildExports(db5.rows, buildVesselPortLookup(vesselSnapshot.rows), now);
+  const grUnmatchedVessels = buildUnmatchedGrVessels(vesselList, loadActiveAssignments());
+  const demurrage = buildWeeklyDemurrage(
+    buildDemurrageRecords(vesselSnapshot).records,
+    buildVesselBuyerLookup(db5.rows),
+  );
   const updatedAt = [db5.updatedAt, db12.updatedAt, db13.updatedAt, db14.updatedAt, db15.updatedAt, db16.updatedAt, db17.updatedAt, vesselSnapshot.updatedAt]
     .filter(Boolean).sort().pop() || null;
 
@@ -264,6 +371,8 @@ function buildWeeklyOpsMeetingFromDatabases({ now = new Date() } = {}) {
     tpgImports,
     glmImports,
     exports,
+    grUnmatchedVessels,
+    demurrage,
     counts: {
       localDeliveries: tpgLocalDeliveries.length,
       imports: tpgImports.length,
@@ -272,6 +381,8 @@ function buildWeeklyOpsMeetingFromDatabases({ now = new Date() } = {}) {
       tpgExports: exports.tpgGlm.length,
       tpgGlmExports: exports.tpgGlm.length,
       grExports: exports.gr.executed.length + exports.gr.open.length + exports.gr.upcoming.length,
+      grUnmatchedVessels: grUnmatchedVessels.length,
+      demurrage: demurrage.length,
     },
   };
 }
@@ -281,6 +392,9 @@ module.exports = {
   buildLocalDeliveries,
   buildEvac,
   buildExports,
+  buildVesselBuyerLookup,
+  buildWeeklyDemurrage,
+  buildUnmatchedGrVessels,
   buildVesselPortLookup,
   isFullyCompleteExport,
   checkbox,

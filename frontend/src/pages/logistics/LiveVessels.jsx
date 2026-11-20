@@ -5,11 +5,56 @@ import 'leaflet/dist/leaflet.css';
 
 import api from '../../services/api';
 import useDataRefresh from '../../services/useDataRefresh';
+import VesselStatus from './VesselStatus';
+import VesselMap from './VesselMap';
 import { buildVesselFinderMapUrl } from './vesselFinderMapUrl';
 import { groupVesselsByLaycan } from './liveVesselsView';
 import './LiveVessels.css';
 
 const text = value => (value == null ? '' : String(value).trim());
+const normalizedId = value => text(value).toUpperCase();
+const LIVE_DEFAULT_ENTITIES = ['GR'];
+
+function shipmentPeriod(contract) {
+  const start = text(contract.periodStart);
+  const end = text(contract.periodEnd);
+  if (start && end && start !== end) return `${start} - ${end}`;
+  return start || end || 'TBA';
+}
+
+function attachSalesContracts(vessels, contractRows) {
+  const rowsByVslId = new Map();
+  (contractRows || []).forEach(row => {
+    const key = normalizedId(row.vslId);
+    if (!key) return;
+    if (!rowsByVslId.has(key)) rowsByVslId.set(key, []);
+    rowsByVslId.get(key).push(row);
+  });
+
+  return (vessels || []).map(vessel => {
+    const ids = new Set([
+      normalizedId(vessel.vslId),
+      ...(vessel.ports || []).map(port => normalizedId(port.vslId)),
+    ].filter(Boolean));
+    const unique = new Map();
+    ids.forEach(id => {
+      (rowsByVslId.get(id) || []).forEach(row => {
+        (row.salesContracts || []).forEach(contract => {
+          const key = `${id}:${contract.id || contract.contractNo || contract.counterparty}`;
+          if (!unique.has(key)) {
+            unique.set(key, {
+              ...contract,
+              buyer: contract.counterparty || 'TBA',
+              shipmentPeriod: shipmentPeriod(contract),
+              loadport: row.loadport,
+            });
+          }
+        });
+      });
+    });
+    return { ...vessel, salesContracts: Array.from(unique.values()) };
+  });
+}
 
 function formatUpdated(value) {
   if (!value) return 'Waiting for DB6';
@@ -71,11 +116,23 @@ function TrackingModal({ vessel, onClose }) {
 
 function MatrixCell({ row, vessel }) {
   if (row.key === 'vessel') {
+    const canTrack = Boolean(vessel.imo || vessel.mmsi);
+    const trackingLabel = vessel.imo
+      ? `IMO ${vessel.imo}`
+      : vessel.mmsi
+        ? `MMSI ${vessel.mmsi}`
+        : 'Tracking ID pending';
     return (
-      <button type="button" className="lv-vessel-button" onClick={() => row.onSelect(vessel)}>
+      <button
+        type="button"
+        className="lv-vessel-button"
+        onClick={() => canTrack && row.onSelect(vessel)}
+        disabled={!canTrack}
+        title={canTrack ? 'Open vessel tracking' : 'IMO or MMSI is not available yet'}
+      >
         <strong>{vessel.vessel}</strong>
         <span>{vessel.vslId}</span>
-        <small>{vessel.imo ? `IMO ${vessel.imo}` : `MMSI ${vessel.mmsi}`}</small>
+        <small>{trackingLabel}</small>
       </button>
     );
   }
@@ -84,17 +141,45 @@ function MatrixCell({ row, vessel }) {
     return <div className="lv-status"><b>OPEN</b><span>{vessel.operations}</span></div>;
   }
 
-  if (row.key === 'cargo') return <div className="lv-cargo">{vessel.cargo}</div>;
+  if (row.key === 'cargo') {
+    return (
+      <div className="lv-cargo">
+        <strong>{vessel.cargo}</strong>
+        <span><small>CR</small>{vessel.cargoReadiness}</span>
+      </div>
+    );
+  }
+  if (row.key === 'contracts') {
+    return (
+      <div className="lv-contract-summary">
+        {(vessel.salesContracts || []).length > 0 ? vessel.salesContracts.map(contract => (
+          <span key={contract.id || `${contract.contractNo}-${contract.buyer}`}>
+            <strong>{contract.buyer}</strong>
+            <small>{contract.shipmentPeriod}</small>
+          </span>
+        )) : <em>Unallocated</em>}
+      </div>
+    );
+  }
   return <div className={`lv-value lv-value-${row.key}`}>{vessel[row.key] || 'TBA'}</div>;
 }
 
 function PortCell({ vessel, portIndex }) {
   const port = vessel.ports[portIndex];
   if (!port) return <span className="lv-empty">-</span>;
+  const schedules = [
+    ['ETA', port.eta],
+    ['ETB', port.etb],
+    ['ETC', port.etc],
+  ].filter(([, value]) => value);
   return (
     <div className="lv-port-cell">
       <span className="lv-port-name">{port.name}</span>
-      {port.schedule && <span className="lv-port-date"><small>{port.scheduleType}</small>{port.schedule}</span>}
+      {schedules.length > 0 && (
+        <span className="lv-port-times">
+          {schedules.map(([label, value]) => <span key={label}><small>{label}</small>{value}</span>)}
+        </span>
+      )}
     </div>
   );
 }
@@ -105,8 +190,8 @@ function VoyageTable({ group, onSelect }) {
     { key: 'direction', label: 'Direction' },
     { key: 'vessel', label: 'Vessel', onSelect },
     { key: 'laycan', label: 'Laycan' },
+    { key: 'contracts', label: 'Buyer / Shipment' },
     { key: 'cargo', label: 'Cargo / Qty' },
-    { key: 'status', label: 'Status' },
   ];
 
   return (
@@ -348,19 +433,21 @@ export default function LiveVessels() {
   const [data, setData] = useState(null);
   const dataRef = useRef(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
-  const [entity, setEntity] = useState('ALL');
+  const [sharedFilters, setSharedFilters] = useState({ query: '', shippers: [], entities: [], ports: [], cargoes: [] });
   const [selectedVessel, setSelectedVessel] = useState(null);
-  const [mapVesselKey, setMapVesselKey] = useState('');
+  const [contractRows, setContractRows] = useState([]);
+  const [statusFilterTarget, setStatusFilterTarget] = useState(null);
 
-  const load = async ({ silent = false, force = false, showIndicator = false } = {}) => {
+  const load = async ({ silent = false, force = false } = {}) => {
     if (!silent && !dataRef.current) setLoading(true);
-    if (showIndicator) setRefreshing(true);
     try {
-      const response = await api.get('/sheets/live-vessels');
+      const [response, contractResponse] = await Promise.all([
+        api.get('/sheets/live-vessels'),
+        api.get('/sheets/vessel-contract').catch(() => null),
+      ]);
       const next = response.data;
+      if (contractResponse?.data?.rows) setContractRows(contractResponse.data.rows);
       if (!force && dataRef.current?.updatedAt === next.updatedAt) return;
       dataRef.current = next;
       setData(next);
@@ -369,7 +456,6 @@ export default function LiveVessels() {
       setError(err.response?.data?.error || 'Failed to load live vessels');
     } finally {
       setLoading(false);
-      if (showIndicator) setRefreshing(false);
     }
   };
 
@@ -379,40 +465,48 @@ export default function LiveVessels() {
     return () => window.clearInterval(timer);
   }, []);
   useDataRefresh({
-    databases: ['DB6'],
-    resources: ['vessel-update'],
+    databases: ['DB1', 'DB2', 'DB3', 'DB4', 'DB5', 'DB6'],
+    resources: ['vessel-update', 'vessel-contract'],
     onRefresh: ({ reason }) => load({ silent: true, force: reason !== 'fallback' }),
   });
 
   const vessels = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return (data?.vessels || []).filter(vessel => {
-      if (entity !== 'ALL' && vessel.entity !== entity) return false;
+    const needle = text(sharedFilters.query).toLowerCase();
+    const selected = key => new Set((sharedFilters[key] || []).map(value => text(value).toUpperCase()));
+    const shippers = selected('shippers');
+    const entities = selected('entities');
+    const ports = selected('ports');
+    const cargoes = selected('cargoes');
+    return attachSalesContracts(data?.vessels, contractRows).filter(vessel => {
+      if (entities.size > 0 && !entities.has(text(vessel.entity).toUpperCase())) return false;
+      const loadPorts = (vessel.ports || []).filter(port => text(port.movement).toUpperCase().includes('LOAD'));
+      const hasPortFilters = shippers.size > 0 || ports.size > 0 || cargoes.size > 0;
+      if (hasPortFilters && !loadPorts.some(port => (
+        (shippers.size === 0 || shippers.has(text(port.shipper || 'TBA').toUpperCase()))
+        && (ports.size === 0 || ports.has(text(port.name).toUpperCase()))
+        && (cargoes.size === 0 || cargoes.has(text(port.cargo).toUpperCase()))
+      ))) return false;
       if (!needle) return true;
       return [
         vessel.vessel, vessel.vslId, vessel.entity, vessel.imo, vessel.mmsi,
-        vessel.direction, vessel.cargo, ...vessel.ports.map(port => port.name),
+        vessel.direction, vessel.cargo,
+        ...(vessel.ports || []).flatMap(port => [port.name, port.shipper, port.cargo]),
+        ...(vessel.salesContracts || []).flatMap(contract => [contract.buyer, contract.contractNo, contract.shipmentPeriod]),
       ].some(value => text(value).toLowerCase().includes(needle));
     });
-  }, [data, entity, query]);
+  }, [contractRows, data, sharedFilters]);
 
   const monthGroups = useMemo(
     () => groupVesselsByLaycan(vessels, data?.updatedAt),
     [data?.updatedAt, vessels],
   );
 
-  useEffect(() => {
-    if (!vessels.some(vessel => vessel.vslId === mapVesselKey)) {
-      setMapVesselKey(vessels[0]?.vslId || '');
-    }
-  }, [mapVesselKey, vessels]);
-
   return (
     <div className="lv-page">
       <header className="lv-toolbar">
         <div className="lv-heading">
-          <h1>Live Vessels</h1>
-          <p>Open DB6 shipments · positions from Vessel DB coordinates</p>
+          <h1>Vessel info</h1>
+          <p>Open DB6 shipments · voyage schedules by laycan month</p>
         </div>
         <div className="lv-metrics" aria-label="Open vessel totals">
           <span><b>{data?.counts?.open ?? 0}</b> open</span>
@@ -423,37 +517,37 @@ export default function LiveVessels() {
         <div className="lv-updated">DB6 updated {formatUpdated(data?.updatedAt)}</div>
       </header>
 
-      <div className="lv-filters">
-        <input
-          value={query}
-          onChange={event => setQuery(event.target.value)}
-          placeholder="Search vessel, port, cargo, IMO or MMSI..."
-          aria-label="Search live vessels"
-        />
-        <select value={entity} onChange={event => setEntity(event.target.value)} aria-label="Filter by entity">
-          <option value="ALL">All entities</option>
-          {(data?.options?.entities || []).map(option => <option key={option} value={option}>{option}</option>)}
-        </select>
-        <button type="button" className="lv-refresh" onClick={() => load({ silent: true, force: true, showIndicator: true })} disabled={refreshing}>
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
-      </div>
+      <div ref={setStatusFilterTarget} className="lv-vessel-status-filter-host" aria-label="Vessel Status filters" />
 
       {error && <div className="lv-error">{error}</div>}
 
       <main className="lv-board" aria-label="Open vessel voyage matrices by laycan month">
         {loading && !data ? (
           <div className="lv-state">Loading open vessels...</div>
-        ) : vessels.length === 0 ? (
-          <div className="lv-state">No open vessels match the current filters.</div>
         ) : (
           <>
-            <div className="lv-month-list">
-              {monthGroups.map(group => <VoyageTable key={group.key} group={group} onSelect={setSelectedVessel} />)}
-            </div>
-            <FleetMap vessels={vessels} selectedKey={mapVesselKey} onSelect={setMapVesselKey} />
+            {vessels.length === 0 ? (
+              <div className="lv-state">No open vessels match the current filters.</div>
+            ) : (
+              <div className="lv-month-list">
+                {monthGroups.map(group => <VoyageTable key={group.key} group={group} onSelect={setSelectedVessel} />)}
+              </div>
+            )}
+            <section className="lv-vessel-status-section" aria-label="Vessel Status">
+              <VesselStatus
+                embedded
+                filterTarget={statusFilterTarget}
+                showAllocatedContracts
+                providedContractRows={contractRows}
+                onFiltersChange={setSharedFilters}
+                defaultEntities={LIVE_DEFAULT_ENTITIES}
+              />
+            </section>
           </>
         )}
+        <section className="lv-vessel-map-section" aria-label="Vessel Map">
+          <VesselMap embedded />
+        </section>
       </main>
 
       {selectedVessel && <TrackingModal vessel={selectedVessel} onClose={() => setSelectedVessel(null)} />}

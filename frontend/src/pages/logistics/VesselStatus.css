@@ -1,3 +1,37 @@
+.vessel-status-filter-controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.vessel-status-shared-search {
+  min-width: 240px;
+  flex: 1 1 280px;
+  display: grid;
+  gap: 4px;
+}
+
+.vessel-status-shared-search > span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.vessel-status-shared-search input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-family: Calibri, Arial, sans-serif;
+  font-size: 13px;
+}
+
+.vessel-status-shared-search input:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+
 .vessel-status-actions {
   display: flex;
   align-items: center;
@@ -74,6 +108,107 @@
 .vessel-status-table-scroll {
   overflow-x: auto;
 }
+
+.vessel-status-root.is-embedded .vessel-status-table-shell,
+.vessel-status-root.is-embedded .vessel-status-table-stage {
+  justify-content: flex-start;
+}
+
+.vessel-status-vessel-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vessel-status-contract-toggle {
+  min-width: 38px;
+  height: 23px;
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, #2563eb 38%, var(--border));
+  border-radius: 4px;
+  background: color-mix(in srgb, #2563eb 8%, var(--bg-card));
+  color: #1d4ed8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: Calibri, Arial, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vessel-status-contract-toggle:hover { background: color-mix(in srgb, #2563eb 15%, var(--bg-card)); }
+.vessel-status-contract-toggle:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+.vessel-status-contract-dropdown-row > td { padding: 0; background: color-mix(in srgb, #2563eb 3%, var(--bg-card)); }
+.vessel-status-contract-dropdown { padding: 8px 12px 10px 70px; border-bottom: 1px solid var(--border-strong); }
+.vessel-status-contract-dropdown-head,
+.vessel-status-contract-dropdown-item {
+  display: grid;
+  grid-template-columns: minmax(110px, .8fr) minmax(150px, 1.25fr) minmax(150px, 1fr) minmax(120px, .8fr);
+  gap: 12px;
+  align-items: center;
+}
+.vessel-status-contract-dropdown-head { padding: 0 8px 4px; color: var(--text-muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.vessel-status-contract-dropdown-item { padding: 6px 8px; border-top: 1px solid var(--border); color: var(--text-main); font-size: 11px; }
+.vessel-status-contract-dropdown-item strong { color: #1d4ed8; }
+
+@media (max-width: 900px) {
+  .vessel-status-contract-dropdown { padding-left: 12px; overflow-x: auto; }
+  .vessel-status-contract-dropdown-head,
+  .vessel-status-contract-dropdown-item { min-width: 650px; }
+}
+
+.vessel-status-contracts {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.vessel-status-contracts-heading {
+  min-height: 52px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vessel-status-contracts-heading h3 {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.vessel-status-contracts-heading p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.vessel-status-contracts-heading > span {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.vessel-status-contracts-scroll { overflow-x: auto; }
+.vessel-status-contracts table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.vessel-status-contracts th,
+.vessel-status-contracts td { padding: 7px 9px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.vessel-status-contracts th { background: var(--bg-table-header, #f8fafc); color: var(--text-muted); font-size: 10px; font-weight: 700; }
+.vessel-status-contracts tbody tr:last-child td { border-bottom: 0; }
+.vessel-status-contracts td { color: var(--text-main); }
+.vessel-status-contracts td:first-child { display: grid; gap: 1px; }
+.vessel-status-contracts td small { color: var(--text-muted); font-size: 9px; }
+.vessel-status-contracts-state { padding: 24px; color: var(--text-muted); text-align: center; font-size: 12px; }
+.vessel-status-contracts-state.is-error { color: #b91c1c; }
 
 .vessel-status-table-shell.is-presenting {
   position: fixed;

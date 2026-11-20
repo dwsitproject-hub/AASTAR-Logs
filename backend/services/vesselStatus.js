@@ -249,11 +249,12 @@ function buildVesselStatus(vdbFormatted, vdbRaw) {
       if (status.toLowerCase() !== 'load') continue;
 
       const shipper = str(row[start + VDB_OFF.SHIPPER]).toUpperCase();
+      const shipperLabel = shipper || 'TBA';
       // Skip discharge ports — they're identified by shipper="Discharge"
       if (shipper === 'DISCHARGE' || shipper === 'DISCH') continue;
 
       const qty = parseFloat(str(row[start + VDB_OFF.QTY]).replace(/[, ]/g, '')) || 0;
-      if (!shipper || qty <= 0) continue;
+      if (qty <= 0) continue;
 
       const cargo = str(row[start + VDB_OFF.CARGO]);
       const portClosed = str(row[start + VDB_OFF.PORT_STATUS]).toLowerCase() === 'closed';
@@ -285,7 +286,7 @@ function buildVesselStatus(vdbFormatted, vdbRaw) {
         month: monthLabel(my),
         monthSort: monthSortKey(my),
         entity,
-        shipper,
+        shipper: shipperLabel,
         vessel,
         port,
         portSort: port.toUpperCase(),
@@ -305,7 +306,7 @@ function buildVesselStatus(vdbFormatted, vdbRaw) {
       };
       rows.push(out);
       if (entity) entities.add(entity);
-      if (shipper) shippers.add(shipper);
+      shippers.add(shipperLabel);
       if (port) ports.add(port);
       if (cargo) cargoes.add(cargo);
     }

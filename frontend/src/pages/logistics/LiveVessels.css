@@ -58,6 +58,8 @@
 .lv-icon-button:focus-visible { outline: 2px solid #278cff; outline-offset: 2px; }
 
 .lv-error { padding: 10px 18px; border-bottom: 1px solid #efb4b4; background: #fff1f1; color: #a51c1c; font-size: 12px; }
+.lv-vessel-status-filter-host { padding: 10px 18px 12px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--bg-app) 68%, var(--bg-card)); }
+.lv-vessel-status-filter-host:empty { display: none; }
 .lv-board { padding: 12px 18px 24px; }
 .lv-month-list { display: grid; gap: 16px; }
 .lv-month-section { width: 100%; max-width: 100%; min-width: 0; }
@@ -136,24 +138,38 @@
 }
 
 .lv-vessel-button:hover { background: color-mix(in srgb, #0b6f63 9%, var(--bg-card)); }
+.lv-vessel-button:disabled { cursor: default; opacity: .72; }
+.lv-vessel-button:disabled:hover { background: transparent; }
 .lv-vessel-button strong { font-size: 13px; line-height: 1.1; }
 .lv-vessel-button span { color: var(--text-muted); font-size: 9px; }
 .lv-vessel-button small { color: #0b6f63; font-size: 9px; font-weight: 700; }
 .lv-value { line-height: 1.25; overflow-wrap: anywhere; }
 .lv-value-direction { font-weight: 700; }
-.lv-cargo { font-style: italic; font-weight: 700; overflow-wrap: anywhere; }
+.lv-cargo { display: grid; justify-items: center; gap: 3px; overflow-wrap: anywhere; }
+.lv-cargo strong { font-style: italic; font-weight: 700; }
+.lv-cargo span { display: flex; align-items: baseline; gap: 5px; color: var(--text-main); font-size: 12px; font-weight: 700; }
+.lv-cargo small { color: #0b6f63; font-size: 10px; font-weight: 800; }
+.lv-contract-summary { display: grid; justify-items: center; gap: 4px; text-align: center; }
+.lv-contract-summary > span { width: 100%; }
+.lv-contract-summary > span { padding-bottom: 4px; border-bottom: 1px solid var(--border); display: grid; gap: 1px; }
+.lv-contract-summary > span:last-child { padding-bottom: 0; border-bottom: 0; }
+.lv-contract-summary strong { color: var(--text-main); font-size: 11px; line-height: 1.15; }
+.lv-contract-summary small { color: var(--text-muted); font-size: 9px; line-height: 1.15; }
+.lv-contract-summary em { color: var(--text-muted); font-size: 10px; font-style: italic; text-align: center; }
 .lv-status { display: grid; justify-items: center; gap: 2px; }
 .lv-status b { padding: 2px 6px; border-radius: 4px; background: #dff3e7; color: #17643b; font-size: 8px; }
 .lv-status span { line-height: 1.25; overflow-wrap: anywhere; }
 
 .lv-port-row th { padding: 3px 7px; background: #294653; font-size: 9px; }
 .lv-port-row td { padding: 3px 6px; }
-.lv-port-cell { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px; text-align: left; }
+.lv-port-cell { display: grid; grid-template-columns: minmax(72px, 1fr) minmax(88px, 1.15fr); align-items: center; gap: 7px; text-align: left; }
 .lv-port-name { min-width: 0; line-height: 1.15; overflow-wrap: anywhere; }
-.lv-port-date { min-width: 58px; padding: 2px 4px; background: #f8d7da; color: #922b35; text-align: center; white-space: nowrap; font-size: 9px; }
-.lv-port-date small { display: block; margin-bottom: 1px; color: #735458; font-size: 7px; font-weight: 700; }
+.lv-port-times { min-width: 0; display: grid; gap: 1px; }
+.lv-port-times > span { min-width: 0; padding: 3px 5px; background: #f8d7da; color: #922b35; display: grid; grid-template-columns: 27px minmax(0, 1fr); gap: 4px; align-items: baseline; font-size: 11px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.lv-port-times small { color: #735458; font-size: 9px; font-weight: 800; }
 .lv-empty { color: var(--text-muted); }
 .lv-state { min-height: 260px; border: 1px solid var(--border); background: var(--bg-card); display: grid; place-items: center; color: var(--text-muted); font-size: 13px; }
+.lv-vessel-status-section { width: 100%; margin-top: 24px; padding-top: 18px; border-top: 2px solid var(--border-strong); }
 
 .lv-fleet-section { margin-top: 20px; border: 1px solid #1f2933; background: var(--bg-card); }
 .lv-fleet-header { min-height: 54px; padding: 8px 12px; border-bottom: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -215,6 +231,7 @@
   .lv-filters { flex-wrap: wrap; }
   .lv-filters input { flex-basis: 100%; }
   .lv-filters select { flex: 1; }
+  .lv-vessel-status-filter-host { padding: 10px 12px 12px; }
   .lv-board { padding: 10px 12px 16px; }
   .lv-month-list { gap: 12px; }
   .lv-table th { width: 92px; min-width: 92px; }
@@ -601,6 +618,12 @@
   .lv-map-vessel-card dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .lv-map-style-switch { bottom: 12px; left: 12px; }
   .lv-map-zoom { top: 62px; right: 12px; }
+}
+
+.lv-vessel-map-section {
+  border-top: 1px solid #d8dfdc;
+  margin-top: 28px;
+  padding-top: 4px;
 }
 @media (max-width: 560px) {
   .lv-toolbar { gap: 10px; }

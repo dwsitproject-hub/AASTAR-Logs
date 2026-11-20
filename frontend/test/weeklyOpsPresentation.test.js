@@ -1,6 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildWeeklyOpsCards, fitPresentationScale, relativeCardIndex } from '../src/pages/operations/weeklyOpsPresentation.js';
+import {
+  balancePresentationRows,
+  buildWeeklyOpsCards,
+  buildWeeklyOpsPresentationCards,
+  fitPresentationScale,
+  relativeCardIndex,
+} from '../src/pages/operations/weeklyOpsPresentation.js';
+
+test('balancePresentationRows preserves line order across balanced presentation columns', () => {
+  const rows = ['one', 'two', 'three', 'four', 'five'];
+  assert.deepEqual(balancePresentationRows(rows, 2), [
+    ['one', 'two', 'three'],
+    ['four', 'five'],
+  ]);
+  assert.deepEqual(balancePresentationRows(['one'], 2), [['one']]);
+  assert.deepEqual(balancePresentationRows([], 2), [[]]);
+});
 
 test('buildWeeklyOpsCards omits empty tables and keeps visible card order', () => {
   const data = {
@@ -32,6 +48,50 @@ test('buildWeeklyOpsCards supports legacy response aliases', () => {
     'tpg-imports',
     'tpg-glm-exports',
   ]);
+});
+
+test('buildWeeklyOpsCards places unmatched GR vessels after upcoming contracts', () => {
+  const cards = buildWeeklyOpsCards({
+    exports: {
+      gr: {
+        executed: [],
+        open: [],
+        upcoming: [{ id: 'upcoming-1' }],
+      },
+    },
+    grUnmatchedVessels: [{ id: 'vsl_26_1000_1' }],
+  });
+
+  assert.deepEqual(cards.map(card => card.id), [
+    'gr-upcoming-exports',
+    'gr-unmatched-vessels',
+  ]);
+  assert.equal(cards[1].kind, 'unmatched-vessel');
+  assert.equal(cards[1].gapBefore, true);
+});
+
+test('buildWeeklyOpsPresentationCards creates one demurrage slide per vessel', () => {
+  const cards = [
+    { id: 'imports', title: 'Imports', kind: 'import', rows: [{ id: 'import-1' }] },
+    {
+      id: 'demurrage',
+      title: 'Demurrage',
+      kind: 'demurrage',
+      rows: [
+        { id: 'vessel-1', vessel: 'MT FIRST' },
+        { id: 'vessel-2', vessel: 'MT SECOND' },
+      ],
+    },
+  ];
+
+  const slides = buildWeeklyOpsPresentationCards(cards);
+
+  assert.deepEqual(slides.map(slide => slide.title), [
+    'Imports',
+    'Demurrage - MT FIRST',
+    'Demurrage - MT SECOND',
+  ]);
+  assert.deepEqual(slides.map(slide => slide.rows.length), [1, 1, 1]);
 });
 
 test('relativeCardIndex wraps in both directions', () => {

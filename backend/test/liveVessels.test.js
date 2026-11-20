@@ -21,31 +21,44 @@ function vesselRow(values = {}) {
 
 function setPort(row, slot, values) {
   const base = PORT_COL_BASE + slot * PORT_COL_STRIDE;
+  row[base + PORT_OFF.vslid] = values.vslId || '';
   row[base + PORT_OFF.port_name] = values.name || '';
   row[base + PORT_OFF.status_ld] = values.movement || '';
   row[base + PORT_OFF.shipper] = values.shipper || '';
   row[base + PORT_OFF.qty] = values.quantity || '';
   row[base + PORT_OFF.l_cargo] = values.cargo || '';
   row[base + PORT_OFF.laycan] = values.laycan || '';
+  row[base + PORT_OFF.cr] = values.cr || '';
   row[base + PORT_OFF.eta] = values.eta || '';
   row[base + PORT_OFF.eta_time] = values.etaTime || '';
   row[base + PORT_OFF.etb] = values.etb || '';
+  row[base + PORT_OFF.etb_time] = values.etbTime || '';
   row[base + PORT_OFF.etc] = values.etc || '';
+  row[base + PORT_OFF.etc_time] = values.etcTime || '';
 }
 
-test('shows open shipments with an identifier or valid DB6 coordinates', () => {
+test('includes every open shipment even when tracking data is unavailable', () => {
   const imo = vesselRow({ vessel: 'MT IMO', imo: '9412725' });
   const mmsi = vesselRow({ vessel: 'MT MMSI', mmsi: '563123456' });
   const coordinates = vesselRow({ vessel: 'MT POSITION', latitude: '1.2345 N', longitude: '103.4567 E' });
-  const noIdentifier = vesselRow({ vessel: 'TBN' });
+  const tbn = vesselRow({ vessel: 'TBN (FOB)' });
+  const namedNoIdentifier = vesselRow({ vessel: 'MT NO ID' });
   const closed = vesselRow({ vessel: 'MT CLOSED', imo: '9340582', status: 'CLOSED' });
 
-  const result = buildLiveVesselsFromRows([[], imo, mmsi, coordinates, noIdentifier, closed]);
+  const result = buildLiveVesselsFromRows([[], imo, mmsi, coordinates, tbn, namedNoIdentifier, closed]);
 
-  assert.deepEqual(result.vessels.map(vessel => vessel.vessel), ['MT IMO', 'MT MMSI', 'MT POSITION']);
-  assert.equal(result.vessels[2].latitude, 1.2345);
-  assert.equal(result.vessels[2].longitude, 103.4567);
-  assert.deepEqual(result.counts, { open: 4, trackable: 3, positioned: 1, missingCoordinates: 3 });
+  assert.deepEqual(result.vessels.map(vessel => vessel.vessel), ['MT IMO', 'MT MMSI', 'MT NO ID', 'MT POSITION', 'TBN (FOB)']);
+  assert.equal(result.vessels[3].latitude, 1.2345);
+  assert.equal(result.vessels[3].longitude, 103.4567);
+  assert.equal(result.vessels[4].isTbn, true);
+  assert.equal(result.vessels[4].hasTrackingId, false);
+  assert.deepEqual(result.counts, {
+    open: 5,
+    listed: 5,
+    trackable: 3,
+    positioned: 1,
+    missingCoordinates: 4,
+  });
 });
 
 test('parses decimal and DMS coordinates while rejecting invalid positions', () => {
@@ -62,8 +75,9 @@ test('parses decimal and DMS coordinates while rejecting invalid positions', () 
 test('deduplicates ports while preserving first sequential occurrence', () => {
   const row = vesselRow({ imo: '9412725' });
   setPort(row, 0, {
-    name: 'Bontang, ID', movement: 'Load', quantity: '3000', cargo: 'POMEFAD',
-    laycan: '10 Oct - 15 Oct', eta: '11 Oct', etaTime: '08:30',
+    vslId: 'vsl_26_0200_1', name: 'Bontang, ID', movement: 'Load', quantity: '3000', cargo: 'POMEFAD',
+    laycan: '10 Oct - 15 Oct', cr: '10 Oct', eta: '11 Oct', etaTime: '08:30',
+    etb: '12 Oct', etbTime: '00:00', etc: '13 Oct', etcTime: '12:00 AM',
   });
   setPort(row, 1, { name: ' bontang, id ', movement: 'Load', etb: '12 Oct' });
   setPort(row, 2, { name: 'Kandla, IN', movement: 'Discharge', etb: '24 Oct' });
@@ -72,11 +86,16 @@ test('deduplicates ports while preserving first sequential occurrence', () => {
   const vessel = result.vessels[0];
 
   assert.deepEqual(vessel.ports.map(port => port.name), ['Bontang, ID', 'Kandla, IN']);
+  assert.equal(vessel.ports[0].vslId, 'vsl_26_0200_1');
   assert.equal(vessel.ports[0].scheduleType, 'ETA');
   assert.equal(vessel.ports[0].schedule, '11 Oct 08:30');
   assert.equal(vessel.direction, 'Kandla, IN');
   assert.equal(vessel.laycan, '10 Oct - 15 Oct');
   assert.equal(vessel.cargo, '3000 POMEFAD');
+  assert.equal(vessel.cargoReadiness, '10 Oct');
+  assert.equal(vessel.eta, '11 Oct 08:30');
+  assert.equal(vessel.etb, '12 Oct');
+  assert.equal(vessel.etc, '13 Oct');
 });
 
 test('uses ETB, ETC and laycan as sequential date fallbacks', () => {

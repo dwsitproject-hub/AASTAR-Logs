@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { toBlob } from 'html-to-image';
 import api from '../../services/api';
 import useDataRefresh from '../../services/useDataRefresh';
 import VesselStatusDetailModal from './VesselStatusDetailModal';
 import './VesselStatus.css';
 
-const DEFAULT_SHIPPERS = ['EUP', 'SPC', 'PMC', 'TPG', 'GLM'];
+const DEFAULT_SHIPPERS = ['EUP', 'SPC', 'PMC', 'TPG', 'GLM', 'TBA'];
 const DEFAULT_ENTITIES = ['A*', 'A*JV', 'GR'];
 const CALIBRI = 'Calibri, Arial, sans-serif';
 
@@ -69,6 +70,13 @@ function fmtNum(n) {
   return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
+function contractPeriod(contract) {
+  const start = String(contract.periodStart || '').trim();
+  const end = String(contract.periodEnd || '').trim();
+  if (start && end && start !== end) return `${start} - ${end}`;
+  return start || end || 'TBA';
+}
+
 // Subtle background tints to differentiate vessels by month
 const MONTH_TINTS = [
   '#eff6ff', // blue-50
@@ -110,7 +118,14 @@ function CloseIcon() {
     </svg>
   );
 }
-export default function VesselStatus() {
+export default function VesselStatus({
+  embedded = false,
+  filterTarget = null,
+  showAllocatedContracts = false,
+  providedContractRows = null,
+  onFiltersChange = null,
+  defaultEntities = DEFAULT_ENTITIES,
+} = {}) {
   const [payload, setPayload] = useState({ vessels: [], details: [], shippers: [], entities: [], ports: [], cargoes: [], updatedAt: null });
   const payloadRef = useRef(payload);
   const [loading, setLoading] = useState(true);
@@ -119,6 +134,7 @@ export default function VesselStatus() {
   const [selectedEntities, setSelectedEntities] = useState([]);
   const [selectedPorts, setSelectedPorts] = useState([]);
   const [selectedCargoes, setSelectedCargoes] = useState([]);
+  const [sharedQuery, setSharedQuery] = useState('');
   const [shippersInitialized, setShippersInitialized] = useState(false);
   const [entitiesInitialized, setEntitiesInitialized] = useState(false);
   const [captureStatus, setCaptureStatus] = useState('idle');
@@ -166,11 +182,11 @@ export default function VesselStatus() {
   // Default entity selection: A*, A*JV, GR (when present in data)
   useEffect(() => {
     if (!entitiesInitialized && payload.entities.length) {
-      const defaults = DEFAULT_ENTITIES.filter(e => payload.entities.includes(e));
+      const defaults = defaultEntities.filter(e => payload.entities.includes(e));
       setSelectedEntities(defaults.length ? defaults : payload.entities);
       setEntitiesInitialized(true);
     }
-  }, [payload.entities, entitiesInitialized]);
+  }, [defaultEntities, payload.entities, entitiesInitialized]);
   useEffect(() => {
     if (payload.ports.length && selectedPorts.length === 0) setSelectedPorts(payload.ports);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,13 +197,26 @@ export default function VesselStatus() {
   }, [payload.cargoes.join('|')]);
 
   const filtered = useMemo(() => {
-    return payload.vessels.filter(v =>
-      (selectedShippers.length === 0 || selectedShippers.includes(v.shipper)) &&
-      (selectedEntities.length === 0 || selectedEntities.includes(v.entity)) &&
-      (selectedPorts.length    === 0 || selectedPorts.includes(v.port)) &&
-      (selectedCargoes.length  === 0 || selectedCargoes.includes(v.cargo))
-    );
-  }, [payload.vessels, selectedShippers, selectedEntities, selectedPorts, selectedCargoes]);
+    const needle = sharedQuery.trim().toLowerCase();
+    return payload.vessels.filter(v => (
+      (selectedShippers.length === 0 || selectedShippers.includes(v.shipper))
+      && (selectedEntities.length === 0 || selectedEntities.includes(v.entity))
+      && (selectedPorts.length === 0 || selectedPorts.includes(v.port))
+      && (selectedCargoes.length === 0 || selectedCargoes.includes(v.cargo))
+      && (!needle || [v.vessel, v.vslId, v.entity, v.shipper, v.port, v.cargo, v.laycan]
+        .some(value => String(value || '').toLowerCase().includes(needle)))
+    ));
+  }, [payload.vessels, selectedShippers, selectedEntities, selectedPorts, selectedCargoes, sharedQuery]);
+
+  useEffect(() => {
+    onFiltersChange?.({
+      query: sharedQuery,
+      shippers: selectedShippers,
+      entities: selectedEntities,
+      ports: selectedPorts,
+      cargoes: selectedCargoes,
+    });
+  }, [onFiltersChange, selectedCargoes, selectedEntities, selectedPorts, selectedShippers, sharedQuery]);
 
   // Stable month ordering for color assignment — derived from sorted source order
   const orderedMonths = useMemo(() => {
@@ -219,6 +248,51 @@ export default function VesselStatus() {
       setContractsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(providedContractRows)) return;
+    setContractRows(providedContractRows);
+    contractsRequestedRef.current = true;
+  }, [providedContractRows]);
+
+  useEffect(() => {
+    if (showAllocatedContracts && !Array.isArray(providedContractRows)) loadContractRows();
+  }, [loadContractRows, providedContractRows, showAllocatedContracts]);
+
+  const allocatedContracts = useMemo(() => {
+    const unique = new Map();
+    (contractRows || []).forEach(row => {
+      (row.salesContracts || []).forEach(contract => {
+        const key = `${String(row.vslId || '').toUpperCase()}:${contract.id || contract.contractNo || contract.counterparty}`;
+        if (unique.has(key)) return;
+        unique.set(key, {
+          key,
+          vessel: row.vessel || 'TBN',
+          vslId: row.vslId || '',
+          loadport: row.loadport || '',
+          contractNo: contract.contractNo || '-',
+          buyer: contract.counterparty || '-',
+          shipmentPeriod: contractPeriod(contract),
+          cargo: contract.cargo || row.cargo || '',
+          quantity: contract.qty,
+        });
+      });
+    });
+    return Array.from(unique.values()).sort((a, b) => (
+      a.vessel.localeCompare(b.vessel, undefined, { sensitivity: 'base' })
+      || a.shipmentPeriod.localeCompare(b.shipmentPeriod, undefined, { sensitivity: 'base' })
+      || a.contractNo.localeCompare(b.contractNo, undefined, { sensitivity: 'base' })
+    ));
+  }, [contractRows]);
+
+  const visibleAllocatedContracts = useMemo(() => {
+    const normalized = value => String(value || '').trim().toUpperCase();
+    return allocatedContracts.filter(contract => filtered.some(vessel => (
+      normalized(vessel.vessel) === normalized(contract.vessel)
+      && (!contract.loadport || normalized(vessel.port) === normalized(contract.loadport))
+      && (!contract.cargo || normalized(vessel.cargo) === normalized(contract.cargo))
+    )));
+  }, [allocatedContracts, filtered]);
 
   const openVesselDetail = useCallback((detailId) => {
     setSelectedDetailId(detailId);
@@ -291,20 +365,56 @@ export default function VesselStatus() {
   };
   const captureLabel = { idle: 'Copy Table', capturing: 'Capturing...', copied: 'Copied!', downloaded: 'Downloaded', failed: 'Failed' }[captureStatus];
   const captureBg = captureStatus === 'copied' || captureStatus === 'downloaded' ? '#1565c0' : '#2d6a4f';
+  const filterControls = !loading && !error ? (
+    <div className="vessel-status-filter-controls">
+      <label className="vessel-status-shared-search">
+        <span>Search</span>
+        <input
+          value={sharedQuery}
+          onChange={event => setSharedQuery(event.target.value)}
+          placeholder="Vessel, port, cargo..."
+          aria-label="Search both vessel tables"
+        />
+      </label>
+      <MultiSelectDropdown label="Shipper" options={payload.shippers} selected={selectedShippers} onChange={setSelectedShippers} minWidth={180} />
+      <MultiSelectDropdown label="Entity" options={payload.entities} selected={selectedEntities} onChange={setSelectedEntities} minWidth={180} />
+      <MultiSelectDropdown label="Port" options={payload.ports} selected={selectedPorts} onChange={setSelectedPorts} minWidth={220} />
+      <MultiSelectDropdown label="Cargo" options={payload.cargoes} selected={selectedCargoes} onChange={setSelectedCargoes} minWidth={180} />
+      <div className="vessel-status-actions">
+        <button
+          type="button"
+          onClick={handleCapture}
+          disabled={captureStatus === 'capturing'}
+          className="vessel-status-action-button"
+          style={{ background: captureBg }}
+        >
+          <CameraIcon />
+          {captureLabel}
+        </button>
+        <button type="button" onClick={openFullscreen} className="vessel-status-action-button vessel-status-fullscreen-button">
+          <FullscreenIcon />
+          Fullscreen
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   return (
-    <div style={{ fontFamily: CALIBRI }}>
-      <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>Vessel Status</h2>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Incoming Export Vessels — Daily Operations</p>
+    <div className={`vessel-status-root${embedded ? ' is-embedded' : ''}`} style={{ fontFamily: CALIBRI }}>
+      {filterTarget && filterControls ? createPortal(filterControls, filterTarget) : null}
+      {!embedded && (
+        <div style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>Vessel Status</h2>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Incoming Export Vessels — Daily Operations</p>
+          </div>
+          {payload.updatedAt && (
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Last updated: <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>{new Date(payload.updatedAt).toLocaleTimeString()}</span>
+            </span>
+          )}
         </div>
-        {payload.updatedAt && (
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Last updated: <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>{new Date(payload.updatedAt).toLocaleTimeString()}</span>
-          </span>
-        )}
-      </div>
+      )}
 
       {loading && <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Loading vessel data...</div>}
       {error && (
@@ -315,28 +425,7 @@ export default function VesselStatus() {
 
       {!loading && !error && (
         <>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 18, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <MultiSelectDropdown label="Shipper" options={payload.shippers} selected={selectedShippers} onChange={setSelectedShippers} minWidth={180} />
-            <MultiSelectDropdown label="Entity"  options={payload.entities} selected={selectedEntities} onChange={setSelectedEntities} minWidth={180} />
-            <MultiSelectDropdown label="Port"    options={payload.ports}    selected={selectedPorts}    onChange={setSelectedPorts}    minWidth={220} />
-            <MultiSelectDropdown label="Cargo"   options={payload.cargoes}  selected={selectedCargoes}  onChange={setSelectedCargoes}  minWidth={180} />
-            <div className="vessel-status-actions">
-              <button
-                type="button"
-                onClick={handleCapture}
-                disabled={captureStatus === 'capturing'}
-                className="vessel-status-action-button"
-                style={{ background: captureBg }}
-              >
-                <CameraIcon />
-                {captureLabel}
-              </button>
-              <button type="button" onClick={openFullscreen} className="vessel-status-action-button vessel-status-fullscreen-button">
-                <FullscreenIcon />
-                Fullscreen
-              </button>
-            </div>
-          </div>
+          {!filterTarget && filterControls}
 
           <div
             className={`vessel-status-table-shell${presenting ? ' is-presenting' : ''}`}
@@ -394,43 +483,74 @@ export default function VesselStatus() {
                 <tbody>
                   {filtered.map((v, i) => {
                     const tint = monthTint(v.month, orderedMonths);
+                    const rowKey = `${v.rowId}-${v.port}-${v.cargo}-${i}`;
+                    const normalized = value => String(value || '').trim().toUpperCase();
+                    const rowContracts = visibleAllocatedContracts.filter(contract => (
+                      normalized(contract.vessel) === normalized(v.vessel)
+                      && (!contract.loadport || normalized(contract.loadport) === normalized(v.port))
+                      && (!contract.cargo || normalized(contract.cargo) === normalized(v.cargo))
+                    ));
                     return (
-                      <tr
-                        key={`${v.rowId}-${v.port}-${v.cargo}-${i}`}
-                        className="vessel-status-row"
-                        tabIndex={0}
-                        aria-label={`Open shipment details for ${v.vessel || 'TBN'} at ${v.port}`}
-                        onClick={() => openVesselDetail(v.detailId)}
-                        onKeyDown={event => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            openVesselDetail(v.detailId);
-                          }
-                        }}
-                        style={{
-                          borderBottom: '1px solid var(--border)',
-                          background: tint,
-                        }}
-                      >
-                        <td style={{ ...tdCell, fontWeight: 500 }}>{v.month}</td>
-                        <td style={{ ...tdCell, fontWeight: 500 }}>{v.entity}</td>
-                        <td style={tdMuted}>{v.shipper}</td>
-                        <td style={{ ...tdCell, fontWeight: 600, color: '#2563eb' }}>{v.vessel}</td>
-                        <td style={tdCell}>{v.port}</td>
-                        <td style={{ ...tdCell, whiteSpace: 'nowrap', textAlign: 'center' }}>
-                          <span>{fmtNum(v.quantity)}</span>
-                          {v.cargo && <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>{v.cargo}</span>}
-                        </td>
-                        <td style={{ ...tdCell, color: '#b45309', whiteSpace: 'nowrap' }}>{v.demmurage}</td>
-                        <td style={{ ...tdCell, color: '#7c2d12', whiteSpace: 'nowrap' }}>{v.laytimeRate}</td>
-                        <td style={{ ...tdCell, color: '#7c2d12', whiteSpace: 'nowrap' }}>{v.laytimeStarts}</td>
-                        <td style={{ ...tdCell, color: '#0c4a6e', whiteSpace: 'nowrap' }}>{v.laycan}</td>
-                        <td style={{ ...tdCell, color: 'var(--text-muted)', whiteSpace: 'nowrap', textAlign: 'center' }}>{v.cargoReadiness}</td>
-                        <td style={{ ...tdCell, color: '#047857', fontWeight: 500, whiteSpace: 'nowrap', textAlign: 'center' }}>{v.eta}</td>
-                        <td style={{ ...tdCell, color: '#0369a1', whiteSpace: 'nowrap', textAlign: 'center' }}>{v.etb}</td>
-                        <td style={{ ...tdCell, color: '#6d28d9', whiteSpace: 'nowrap', textAlign: 'center' }}>{v.etc}</td>
-                        <td style={{ ...tdCell, color: 'var(--text-muted)' }}>{v.remarks}</td>
-                      </tr>
+                      <React.Fragment key={rowKey}>
+                        <tr
+                          className="vessel-status-row"
+                          tabIndex={0}
+                          aria-label={`Open shipment details for ${v.vessel || 'TBN'} at ${v.port}`}
+                          onClick={() => openVesselDetail(v.detailId)}
+                          onKeyDown={event => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              openVesselDetail(v.detailId);
+                            }
+                          }}
+                          style={{
+                            borderBottom: '1px solid var(--border)',
+                            background: tint,
+                          }}
+                        >
+                          <td style={{ ...tdCell, fontWeight: 500 }}>{v.month}</td>
+                          <td style={{ ...tdCell, fontWeight: 500 }}>{v.entity}</td>
+                          <td style={tdMuted}>{v.shipper}</td>
+                          <td style={{ ...tdCell, fontWeight: 600, color: '#2563eb' }}>
+                            <div className="vessel-status-vessel-cell">
+                              <span>{v.vessel}</span>
+                            </div>
+                          </td>
+                          <td style={tdCell}>{v.port}</td>
+                          <td style={{ ...tdCell, whiteSpace: 'nowrap', textAlign: 'center' }}>
+                            <span>{fmtNum(v.quantity)}</span>
+                            {v.cargo && <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>{v.cargo}</span>}
+                          </td>
+                          <td style={{ ...tdCell, color: '#b45309', whiteSpace: 'nowrap' }}>{v.demmurage}</td>
+                          <td style={{ ...tdCell, color: '#7c2d12', whiteSpace: 'nowrap' }}>{v.laytimeRate}</td>
+                          <td style={{ ...tdCell, color: '#7c2d12', whiteSpace: 'nowrap' }}>{v.laytimeStarts}</td>
+                          <td style={{ ...tdCell, color: '#0c4a6e', whiteSpace: 'nowrap' }}>{v.laycan}</td>
+                          <td style={{ ...tdCell, color: 'var(--text-muted)', whiteSpace: 'nowrap', textAlign: 'center' }}>{v.cargoReadiness}</td>
+                          <td style={{ ...tdCell, color: '#047857', fontWeight: 500, whiteSpace: 'nowrap', textAlign: 'center' }}>{v.eta}</td>
+                          <td style={{ ...tdCell, color: '#0369a1', whiteSpace: 'nowrap', textAlign: 'center' }}>{v.etb}</td>
+                          <td style={{ ...tdCell, color: '#6d28d9', whiteSpace: 'nowrap', textAlign: 'center' }}>{v.etc}</td>
+                          <td style={{ ...tdCell, color: 'var(--text-muted)' }}>{v.remarks}</td>
+                        </tr>
+                        {showAllocatedContracts && rowContracts.length > 0 && (
+                          <tr className="vessel-status-contract-dropdown-row">
+                            <td colSpan={15}>
+                              <div className="vessel-status-contract-dropdown">
+                                <div className="vessel-status-contract-dropdown-head">
+                                  <span>Contract</span><span>Buyer</span><span>Shipment Period</span><span>Cargo / Qty</span>
+                                </div>
+                                {rowContracts.map(contract => (
+                                  <div key={contract.key} className="vessel-status-contract-dropdown-item">
+                                    <strong>{contract.contractNo}</strong>
+                                    <span>{contract.buyer}</span>
+                                    <span>{contract.shipmentPeriod}</span>
+                                    <span>{[fmtNum(contract.quantity), contract.cargo].filter(Boolean).join(' ') || '-'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>

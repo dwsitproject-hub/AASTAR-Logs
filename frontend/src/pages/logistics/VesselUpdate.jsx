@@ -372,8 +372,8 @@ export default function VesselUpdate({ embedded = false }) {
 
               <div style={{ padding: '0 14px 12px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '6px 10px', marginBottom: 10 }}>
-                  {VESSEL_COLS.map(([field, col, kind]) => (
-                    <FieldCell key={field} label={field.replace('_',' ')} value={v[field]} options={data?.options} kind={kind}
+                  {VESSEL_COLS.map(([field, col, kind, displayLabel]) => (
+                    <FieldCell key={field} label={displayLabel || field.replace('_',' ')} value={v[field]} options={data?.options} kind={kind}
                       onChange={val => setCell(v.row, col, val)}
                       inputBg={inputBg} borderCol={inputBorder} textCol={textCol} mutedCol={mutedCol} />
                   ))}

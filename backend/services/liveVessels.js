@@ -18,6 +18,10 @@ function digits(value) {
   return text(value).replace(/\D/g, '');
 }
 
+function isTbnVessel(value) {
+  return /^TBN(?:$|[\s(/_-])/i.test(text(value));
+}
+
 function parseCoordinate(value) {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   const raw = text(value);
@@ -54,11 +58,18 @@ function uniqueStrings(values) {
   });
 }
 
+function visibleTime(value) {
+  const clock = text(value);
+  const normalized = clock.replace(/\s+/g, ' ').toUpperCase();
+  if (/^(?:0?0:00(?::00)?|12:00(?::00)? AM)$/.test(normalized)) return '';
+  return clock;
+}
+
 function withTime(date, time) {
   const day = text(date);
-  const clock = text(time);
+  const clock = visibleTime(time);
   if (!day) return '';
-  return clock && clock !== '00:00' ? `${day} ${clock}` : day;
+  return clock ? `${day} ${clock}` : day;
 }
 
 function portSchedule(row, base) {
@@ -86,6 +97,7 @@ function buildPortRotation(row) {
     const candidate = {
       sequence: ports.length + 1,
       sourceSlot: index + 1,
+      vslId: text(row[base + PORT_OFF.vslid]),
       name,
       movement: text(row[base + PORT_OFF.status_ld]),
       shipper: text(row[base + PORT_OFF.shipper]),
@@ -94,6 +106,10 @@ function buildPortRotation(row) {
       cargo: text(row[base + PORT_OFF.l_cargo]),
       status: text(row[base + PORT_OFF.status_oc]),
       laycan: text(row[base + PORT_OFF.laycan]),
+      cr: text(row[base + PORT_OFF.cr]),
+      eta: withTime(row[base + PORT_OFF.eta], row[base + PORT_OFF.eta_time]),
+      etb: withTime(row[base + PORT_OFF.etb], row[base + PORT_OFF.etb_time]),
+      etc: withTime(row[base + PORT_OFF.etc], row[base + PORT_OFF.etc_time]),
       scheduleType: schedule.type,
       schedule: schedule.value,
     };
@@ -133,11 +149,11 @@ function buildLiveVesselsFromRows(rows) {
     const latitude = parseCoordinate(row[VESSEL_COL.latitude]);
     const longitude = parseCoordinate(row[VESSEL_COL.longitude]);
     const hasDbPosition = validLatLng(latitude, longitude);
-    if (!hasImo && !hasMmsi && !hasDbPosition) continue;
 
     const vessel = text(row[VESSEL_COL.vessel]);
     const vslId = text(row[VESSEL_COL.vsl_id]);
     if (!vessel && !vslId) continue;
+    const isTbn = isTbnVessel(vessel);
 
     const ports = buildPortRotation(row);
     const dischargePorts = ports.filter(port => port.movement.toUpperCase().includes('DISCHARGE'));
@@ -156,23 +172,31 @@ function buildLiveVesselsFromRows(rows) {
       latitude: hasDbPosition ? latitude : null,
       longitude: hasDbPosition ? longitude : null,
       hasDbPosition,
+      hasTrackingId: hasImo || hasMmsi,
+      isTbn,
       status,
       operations: text(row[VESSEL_COL.ops]) || 'Schedule pending',
       direction: (dischargePorts.at(-1) || ports.at(-1))?.name || 'TBA',
       laycan: uniqueStrings(loadPorts.map(port => port.laycan)).join(' / ') || 'TBA',
       cargo: uniqueStrings(loadPorts.map(port => [port.quantity, port.cargo].filter(Boolean).join(' '))).join(' / ') || 'TBA',
+      cargoReadiness: uniqueStrings(loadPorts.map(port => port.cr)).join(' / ') || 'TBA',
+      eta: uniqueStrings(loadPorts.map(port => port.eta)).join(' / ') || 'TBA',
+      etb: uniqueStrings(loadPorts.map(port => port.etb)).join(' / ') || 'TBA',
+      etc: uniqueStrings(loadPorts.map(port => port.etc)).join(' / ') || 'TBA',
       ports,
     });
   }
 
   vessels.sort((a, b) => a.vessel.localeCompare(b.vessel, undefined, { sensitivity: 'base' }));
   const positionedCount = vessels.filter(vessel => vessel.hasDbPosition).length;
+  const trackableCount = vessels.filter(vessel => vessel.hasTrackingId || vessel.hasDbPosition).length;
   return {
     vessels,
     maxPorts: vessels.reduce((max, vessel) => Math.max(max, vessel.ports.length), 0),
     counts: {
       open: openCount,
-      trackable: vessels.length,
+      listed: vessels.length,
+      trackable: trackableCount,
       positioned: positionedCount,
       missingCoordinates: Math.max(0, openCount - positionedCount),
     },
