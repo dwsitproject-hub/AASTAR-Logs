@@ -3,8 +3,8 @@
 # built on this server by release.sh; this file never builds.
 #
 # Published on the server's PRIVATE address, 172.28.80.50:3150: users open
-# http://172.28.80.50:3150 until aastar-logistic.kpndomain.com resolves; then the
-# host nginx vhost (nginx/host-vhost-aastar-logistic.conf) forwards the name to this
+# http://172.28.80.50:3150 until aastar-logs.kpndomain.com resolves; then the
+# host nginx vhost (nginx/host-vhost-aastar-logs.conf) forwards the name to this
 # same address, so the domain switch changes no container.
 #
 # Run through deploy/production/dc.sh fe, which reads from /opt/astar-erp:

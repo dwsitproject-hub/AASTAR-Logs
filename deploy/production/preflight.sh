@@ -18,7 +18,7 @@ ROLE="${1:-}"
 case "$ROLE" in be|fe) ;; *) echo "usage: preflight.sh be|fe"; exit 2 ;; esac
 APP=astar-erp
 NAS=no
-APP_HOST="${APP_HOST:-aastar-logistic.kpndomain.com}"
+APP_HOST="${APP_HOST:-aastar-logs.kpndomain.com}"
 HUB_HOST_IP="${HUB_HOST_IP:-172.28.80.50}"
 RDS_HOST="${RDS_HOST:-pgm-d9jn3khh0b3907w4.pgsql.ap-southeast-5.rds.aliyuncs.com}"
 if [ "$ROLE" = be ]; then

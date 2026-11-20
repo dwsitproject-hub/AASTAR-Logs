@@ -7,7 +7,7 @@ checks — on the production servers, database and DWS Hub, against the **produc
 
 ```
 Browser ──► FE server 172.28.80.50:3150   astar-erp-frontend (nginx: web app, /api and /api/ws proxied)
-            (later aastar-logistic.kpndomain.com via the host nginx on :80)
+            (later aastar-logs.kpndomain.com via the host nginx on :80)
                       │ /api, /api/ws
                       ▼
             BE server 172.28.80.51:4150   astar-erp-backend (Node API: sign-in, roles, Google Sheets sync every 15 s)
@@ -70,7 +70,7 @@ host lost the NAS. Here:
 | The app registered in the **production** DWS Hub: client id, both redirect URIs, SDK key; Sentinel's GitHub token covering `AASTAR-Logs` | Hub administrator, GitHub org owner | §4 |
 | Read-only GitHub deploy key per server | Repository admin | §5 |
 | A Google service account with **Editor** access to the six production spreadsheets, and its JSON key | Google Cloud project owner, spreadsheet owners | §6 |
-| DNS A record `aastar-logistic.kpndomain.com → 172.28.80.50` | IT infrastructure (DNS) | §8 |
+| DNS A record `aastar-logs.kpndomain.com → 172.28.80.50` | IT infrastructure (DNS) | §8 |
 | Firewall rules (table below) | Network team | §2 |
 | A release tag, e.g. `v1.0.0`, of a commit that passed staging and is merged into `main` | Release owner | §5, §12 |
 
@@ -147,7 +147,7 @@ curl -s --resolve dwshub.kpndomain.com:443:172.28.80.50 https://dwshub.kpndomain
 |---|---|
 | `sso_mode` | `oidc` (public client, PKCE) |
 | `oauth_client_id` | `astar-erp` → `DWS_HUB_CLIENT_ID` |
-| `oidc_redirect_uris` | `http://172.28.80.50:3150/api/auth/sso/callback` **and** `http://aastar-logistic.kpndomain.com/api/auth/sso/callback` |
+| `oidc_redirect_uris` | `http://172.28.80.50:3150/api/auth/sso/callback` **and** `http://aastar-logs.kpndomain.com/api/auth/sso/callback` |
 | Target / launch URL | `http://172.28.80.50:3150/api/auth/sso/login` (the domain's, after §8) |
 | Icon | `docs/design/app-icon/dws-hub-tile-512.png` |
 
@@ -155,7 +155,7 @@ Registering both redirect URIs now means the DNS switch (§8) is only a settings
 tile signs users in directly (the app restarts a Hub-launched sign-in by itself).
 
 **Hub SDK** — the application → **SDK**: copy the production key to `VITE_HUB_SDK_KEY` in `fe-build.env` (§8).
-**Allowed origins**: `http://172.28.80.50:3150` and `http://aastar-logistic.kpndomain.com`. Never use staging's key.
+**Allowed origins**: `http://172.28.80.50:3150` and `http://aastar-logs.kpndomain.com`. Never use staging's key.
 
 **Sentinel** — Admin → Analytic → *AASTAR Logistic (Export)* → **Sentinel settings**: repository
 `dwsitproject-hub/AASTAR-Logs`, branch `main`, application folder empty, analyse automatically ✓, and the notes from
@@ -347,25 +347,74 @@ It builds the web app with the Hub SDK and the release's commit, starts `astar-e
 checks it. Expected ending: `ok`, `{"status":"ok"}` (through to the backend), `data-release="…"`, and
 `astar-erp-frontend is running v1.0.0`.
 
-**When `aastar-logistic.kpndomain.com` resolves** (DNS request, §2). **PuTTY on 172.28.80.50** — one new vhost on
-the shared host nginx; `nginx -t` is not optional:
+### The domain: `http://aastar-logs.kpndomain.com`
+
+When `aastar-logs.kpndomain.com` resolves to 172.28.80.50 (DNS request, §2). The host nginx on the FE server serves
+every other application's domain too, so this adds **one file** and touches nothing else: no `default_server`, no
+change to another vhost, a reload (never a restart), and a before/after check of every other site.
+
+**1. Look first — PuTTY on 172.28.80.50** (read-only):
 
 ```bash
-cp /opt/astar-erp/src/deploy/production/nginx/host-vhost-aastar-logistic.conf /etc/nginx/conf.d/aastar-logistic.conf
-nginx -t && systemctl reload nginx
-curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: aastar-logistic.kpndomain.com' http://127.0.0.1/
+getent hosts aastar-logs.kpndomain.com
+nginx -T 2>/dev/null | grep -E '^\s*include'
+nginx -T 2>/dev/null | grep -nE 'server_name.*aastar-logs|default_server|listen\s+172\.28\.80\.50:80'
+ls /etc/nginx/conf.d/aastar-logs.conf 2>/dev/null
 ```
 
-Expected: `syntax is ok`, then `200`. **PuTTY on 172.28.80.51 (BE)** — `nano /opt/astar-erp/production.env`:
-`FRONTEND_URL=http://aastar-logistic.kpndomain.com`, `CORS_ORIGINS=http://172.28.80.50:3150`,
-`DWS_HUB_REDIRECT_URI=http://aastar-logistic.kpndomain.com/api/auth/sso/callback`, then:
+| Line | Must be | If not |
+|---|---|---|
+| `getent hosts` | `172.28.80.50  aastar-logs.kpndomain.com` | Wait for DNS (§2) |
+| `include` lines | One of them is `/etc/nginx/conf.d/*.conf` | Put the file in the folder the includes name instead (e.g. `sites-enabled/`) |
+| `server_name.*aastar-logs` | Nothing | The name is already used by another vhost: stop and ask its owner |
+| `default_server` | Lines from other vhosts are fine | — (this vhost never adds one) |
+| `listen 172.28.80.50:80` | Nothing | Another vhost listens on the address itself: add `listen 172.28.80.50:80;` under `listen 80;` in the new file, or nginx never chooses it |
+| `ls …aastar-logs.conf` | `No such file` | An earlier attempt: compare it before replacing |
+
+**2. Record how every site answers now, back up, add the vhost, reload:**
+
+```bash
+bash /opt/astar-erp/src/deploy/production/nginx/vhost-check.sh before
+tar czf /root/nginx-backup-$(date +%Y%m%d-%H%M).tgz -C /etc nginx
+cp /opt/astar-erp/src/deploy/production/nginx/host-vhost-aastar-logs.conf /etc/nginx/conf.d/aastar-logs.conf
+nginx -t && systemctl reload nginx
+```
+
+`nginx -t` must say `syntax is ok` and `test is successful`, **with no** `conflicting server name` warning. If it
+fails, nothing was reloaded and every site still runs the old configuration: `rm /etc/nginx/conf.d/aastar-logs.conf`
+and read the error.
+
+**3. Check the new name and every other site:**
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' --resolve aastar-logs.kpndomain.com:80:172.28.80.50 http://aastar-logs.kpndomain.com/
+curl -s --resolve aastar-logs.kpndomain.com:80:172.28.80.50 http://aastar-logs.kpndomain.com/api/health ; echo
+bash /opt/astar-erp/src/deploy/production/nginx/vhost-check.sh after
+```
+
+Expected: `200`, `{"status":"ok"}`, and `OK - every site answers exactly as before`. **Undo** (any time, all other
+sites keep working): `rm /etc/nginx/conf.d/aastar-logs.conf && nginx -t && systemctl reload nginx`.
+
+**4. Point the app at the domain — PuTTY on 172.28.80.51 (BE)** — `nano /opt/astar-erp/production.env`:
+
+| Setting | Value |
+|---|---|
+| `FRONTEND_URL` | `http://aastar-logs.kpndomain.com` |
+| `CORS_ORIGINS` | `http://172.28.80.50:3150` (the IP address keeps working for pages) |
+| `DWS_HUB_REDIRECT_URI` | `http://aastar-logs.kpndomain.com/api/auth/sso/callback` |
 
 ```bash
 /opt/astar-erp/src/deploy/production/dc.sh be up -d --force-recreate
+docker exec astar-erp-backend printenv FRONTEND_URL DWS_HUB_REDIRECT_URI
 ```
 
-Hub: set the Target / launch URL to `http://aastar-logistic.kpndomain.com/api/auth/sso/login`. From then on users
-open the domain; signing in from the IP address ends with *"Your sign-in took too long or was started elsewhere"*.
+**5. Production DWS Hub** (§4): the redirect URI `http://aastar-logs.kpndomain.com/api/auth/sso/callback` must be
+registered (byte-exact); set the Target / launch URL to `http://aastar-logs.kpndomain.com/api/auth/sso/login`; add
+`http://aastar-logs.kpndomain.com` to the SDK's allowed origins.
+
+**6. Test:** open `http://aastar-logs.kpndomain.com` → **Sign in with DWS Hub** → dashboard; then the app's tile in
+the Hub. From then on users open the domain; signing in from the IP address ends with *"Your sign-in took too long or
+was started elsewhere"*.
 
 ## 9. First sign-in, administrators and the data
 
@@ -404,14 +453,14 @@ with DWS Hub**, or the app's tile in the Hub.
 
 ## 11. HTTPS (recommended)
 
-When a certificate for `aastar-logistic.kpndomain.com` exists on the FE host nginx (check whether its
+When a certificate for `aastar-logs.kpndomain.com` exists on the FE host nginx (check whether its
 `*.kpndomain.com` certificate covers the name):
 
 1. Vhost: a `listen 443 ssl;` server with the certificate and the same locations; the port-80 server reduced to
    `return 301 https://$host$request_uri;` — `nginx -t && systemctl reload nginx`.
-2. BE `production.env`: `FRONTEND_URL=https://aastar-logistic.kpndomain.com`,
+2. BE `production.env`: `FRONTEND_URL=https://aastar-logs.kpndomain.com`,
    `DWS_HUB_REDIRECT_URI=https://…/api/auth/sso/callback`, **delete** `SESSION_COOKIE_SECURE` (the backend refuses it
-   with an https address), optionally `GOOGLE_CLIENT_ID` (with `https://aastar-logistic.kpndomain.com` as an
+   with an https address), optionally `GOOGLE_CLIENT_ID` (with `https://aastar-logs.kpndomain.com` as an
    authorised origin on the Google client). `dc.sh be up -d --force-recreate`.
 3. Hub: redirect URI, launch URL and SDK allowed origin with `https://`.
 4. Everyone signs in again (the cookies become `__Host-erp_session` / `__Host-erp_sso`).
@@ -495,6 +544,6 @@ Everything in [DEPLOYMENT-STAGING.md](DEPLOYMENT-STAGING.md) §13 applies, with 
 | *"DWS Hub is not reachable right now"* | The container cannot reach `dwshub.kpndomain.com` via 172.28.80.50:443 (`HUB_HOST_IP` in `be.compose.yml`, firewall). |
 | Every user shows the same address in the audit log | The vhost's `X-Forwarded-For` or the container's trusted range (§8); the FE `.env` subnet must match the running network. |
 | Spreadsheet values change back, or odd match IDs appear | Another copy of the app syncs the same spreadsheets: stop it (§2). Only one instance may sync them. |
-| `nginx -t` fails after copying the vhost | Remove `/etc/nginx/conf.d/aastar-logistic.conf` and reload — the other sites keep working; fix and retry. |
+| `nginx -t` fails after copying the vhost | Remove `/etc/nginx/conf.d/aastar-logs.conf` and reload — the other sites keep working; fix and retry. |
 
 Logs: `docker logs -f astar-erp-backend` (BE), `docker logs -f astar-erp-frontend` (FE).

@@ -5,7 +5,7 @@
 #
 # Users reach this container two ways: directly on the server's private address
 # (http://172.28.80.50:3150) and, once DNS exists, through the host nginx vhost
-# (aastar-logistic.kpndomain.com). The host nginx's connections arrive either from
+# (aastar-logs.kpndomain.com). The host nginx's connections arrive either from
 # the app network's gateway (Docker's userland proxy) or from the server's own
 # address (iptables), depending on the host's Docker settings - so exactly those two
 # may report the visitor's address, and nobody else's X-Forwarded-For is believed.
